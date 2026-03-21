@@ -61,88 +61,88 @@
   <div id="status">Waiting for your sacrifice...</div>
   <div id="time">-- ms</div>
 
-  <script>
-    let worker = null;
-    let isRunning = false;
+<script>
+  let worker = null;
+  let isRunning = false;
 
-    function initWorker() {
-      if (worker) worker.terminate();
-      
-      const blob = new Blob([`
-        !function() {
-          function t() {
-            let start = performance.now();
-            let dummy = 0;
-            for (let i = 0; i < progressSteps; i++) {
-              if ((100 * i / progressSteps) % 1 === 0) {
-                postMessage(["BenchProgress", Math.floor(100 * i / progressSteps)]);
-              }
-              kernel();
-            }
-            let end = performance.now();
-            postMessage(["BenchResult", end - start]);
-          }
+  function initWorker() {
+    if (worker) worker.terminate();
+    
+    const blob = new Blob([`
+      importScripts('https://unpkg.com/gpu.js@latest/dist/gpu-browser.min.js');
 
-          const loopSize = 10000;
-          const outputSize = 1000000;
-          const progressSteps = 400;
+      let gpu = new GPU({ mode: "gpu" });
 
-          const gpu = new GPU({ mode: "gpu" });
+      const kernel = gpu.createKernel(function() {
+        let t = 0;
+        for (let i = 0; i < this.constants.size; i++) {
+          t += this.thread.x % 5466587 * (this.thread.x % 6847648) - this.thread.x % 51374684;
+          t = t / (this.thread.x % 9769864) * 6541;
+          t = Math.exp(t);
+          t = Math.sqrt(t);  // reduced nesting - still burns FP units hard
+        }
+        return t;
+      })
+      .setOptimizeFloatMemory(true)
+      .setImmutable(true)
+      .setConstants({ size: 2000 })  // lowered from 10000 to avoid timeout
+      .setLoopMaxIterations(2000)
+      .setOutput([1, 1]);  // tiny output - no massive buffer allocation
 
-          const kernel = gpu.createKernel(function() {
-            let t = 0;
-            for (let i = 0; i < this.constants.size; i++) {
-              t = (t + this.thread.x % 5466587 * (this.thread.x % 6847648) - this.thread.x % 51374684) / (this.thread.x % 9769864) * 6541;
-              t = Math.exp(t);
-              t = Math.sqrt(Math.sqrt(Math.sqrt(Math.sqrt(Math.sqrt(Math.sqrt(t))))));
-            }
-            return t;
-          })
-          .setOptimizeFloatMemory(true)
-          .setImmutable(true)
-          .setConstants({ size: loopSize })
-          .setLoopMaxIterations(loopSize)
-          .setOutput([outputSize]);
+      kernel(); // warm-up once
 
-          kernel(); // warm-up
+      let timeoutId;
 
-          onmessage = function(e) {
-            if (e.data[0] === "Run") {
-              t();
-            }
-          };
-        }();
-      `], { type: 'text/javascript' });
+      onmessage = function(e) {
+        if (e.data[0] === "Run") {
+          timeoutId = setTimeout(() => {
+            postMessage(["BenchResult", 999999]); // fake huge time if hung
+            close(); // kill worker
+          }, 15000); // 15s max before force-kill
 
-      worker = new Worker(URL.createObjectURL(blob));
+          const start = performance.now();
+          kernel();
+          const end = performance.now();
+          clearTimeout(timeoutId);
 
-      worker.onmessage = function(e) {
-        const [type, value] = e.data;
-        if (type === "BenchProgress") {
-          document.getElementById('status').textContent = `GPU melting... ${value}%`;
-        } else if (type === "BenchResult") {
-          document.getElementById('time').textContent = `${Math.round(value)} ms`;
-          document.getElementById('status').textContent = "GPU survived (barely) — click again to finish it";
-          isRunning = false;
-          document.getElementById('crashBtn').disabled = false;
+          postMessage(["BenchResult", end - start]);
         }
       };
-    }
+    `], { type: 'text/javascript' });
 
-    document.getElementById('crashBtn').onclick = function() {
-      if (isRunning) return;
-      isRunning = true;
-      this.disabled = true;
-      document.getElementById('status').textContent = "Nuking GPU... hold on";
-      document.getElementById('time').textContent = "-- ms";
+    worker = new Worker(URL.createObjectURL(blob));
 
-      if (!worker) initWorker();
-
-      worker.postMessage(["Run"]);
+    worker.onmessage = function(e) {
+      const [type, value] = e.data;
+      if (type === "BenchResult") {
+        document.getElementById('time').textContent = value >= 999999 ? "TIMEOUT/HUNG - GPU probably died" : \`\${Math.round(value)} ms\`;
+        document.getElementById('status').textContent = value >= 999999 ? "GPU resisted... or crashed silently. Try again or check Task Manager" : "GPU survived (for now) - click to nuke harder";
+        isRunning = false;
+        document.getElementById('crashBtn').disabled = false;
+      }
     };
 
-    // Init on load
-    initWorker();
-  </script>
+    worker.onerror = function(err) {
+      console.error(err);
+      document.getElementById('status').textContent = "Worker crashed: " + (err.message || "Unknown error - GPU driver reset?");
+      isRunning = false;
+      document.getElementById('crashBtn').disabled = false;
+    };
+  }
+
+  document.getElementById('crashBtn').onclick = function() {
+    if (isRunning) return;
+    isRunning = true;
+    this.disabled = true;
+    document.getElementById('status').textContent = "Nuking GPU... hold on (15s timeout if hung)";
+    document.getElementById('time').textContent = "-- ms";
+
+    if (!worker) initWorker();
+    worker.postMessage(["Run"]);
+  };
+
+  initWorker(); // preload
+</script>
+  
 </body>
 </html>
