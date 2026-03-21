@@ -1,145 +1,211 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="bg-black text-white">
 <head>
-<meta charset="UTF-8">
-<title>STRESS MY PC GPU - CRASH EDITION</title>
-<style>
-  body { margin:0; background:#000; color:#f00; font-family:Arial; overflow:hidden; }
-  #ui { position:absolute; top:20px; left:20px; z-index:10; background:rgba(0,0,0,0.8); padding:20px; border:3px solid #f00; border-radius:10px; max-width:400px; }
-  h1 { margin:0 0 15px; font-size:32px; text-shadow:0 0 15px #f00; }
-  button { padding:15px 30px; font-size:20px; margin:10px 5px; cursor:pointer; border:none; }
-  #start { background:#c00; color:white; }
-  #stop { background:#444; color:white; display:none; }
-  select, label { display:block; margin:15px 0; font-size:18px; color:#fff; }
-  #stats { font-size:24px; font-weight:bold; margin:15px 0; color:#ff0; }
-  #warning { position:fixed; inset:0; background:rgba(255,0,0,0.9); color:white; display:flex; align-items:center; justify-content:center; font-size:28px; text-align:center; padding:40px; z-index:50; flex-direction:column; }
-  #warning button { margin-top:20px; background:#000; color:#fff; padding:20px 40px; font-size:24px; }
-  canvas { position:fixed; inset:0; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STRESS MY PC - OVERLOAD 100% GPU</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'neon-green': '#39ff14',
+            'neon-red': '#ff073a',
+            'dark-bg': '#0a0a0a',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { text-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14; }
+      50% { text-shadow: 0 0 20px #39ff14, 0 0 40px #39ff14; }
+    }
+    .glow-text { animation: pulse-glow 2s infinite; }
+  </style>
 </head>
-<body>
+<body class="min-h-screen bg-gradient-to-br from-dark-bg via-gray-900 to-black overflow-hidden">
+  <!-- WARNING OVERLAY -->
+  <div id="warning" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-md">
+    <div class="text-center p-8 max-w-2xl mx-auto">
+      <h1 class="text-5xl font-bold text-neon-red mb-6 glow-text">DANGER: 100% GPU/CPU OVERLOAD</h1>
+      <p class="text-xl mb-8 text-gray-300">This will max out your GPU's 3D engine in Task Manager (often 90-100% like mprep.info), overheat your rig, and may crash, BSOD, or reboot unstable hardware. Fans will scream. Save your shit first.</p>
+      <button onclick="document.getElementById('warning').style.display='none';" class="px-10 py-5 bg-neon-red hover:bg-red-700 text-white text-2xl font-bold rounded-lg shadow-2xl transition transform hover:scale-105">
+        FUCK IT, NUKE MY PC
+      </button>
+    </div>
+  </div>
 
-<div id="warning">
-  <div>THIS WILL FUCK YOUR PC — extreme GPU/CPU load, overheating, possible crash, BSOD, reboot, or hardware damage if unstable.<br>Save everything, risk it if you dare.</div>
-  <button onclick="document.getElementById('warning').style.display='none';">I accept, nuke my shit</button>
-</div>
+  <!-- MAIN UI -->
+  <div class="relative z-10 container mx-auto p-6">
+    <header class="text-center mb-10">
+      <h1 class="text-6xl md:text-8xl font-black text-neon-green glow-text tracking-widest">STRESS MY PC</h1>
+      <p class="text-xl text-gray-400 mt-2">Inspired by mprep.info — pushes 3D GPU to ~100% in Task Manager</p>
+    </header>
 
-<div id="ui">
-  <h1>STRESS MY PC</h1>
-  <select id="mode">
-    <option value="gpu">GPU Only (WebGL hell)</option>
-    <option value="cpu">CPU Only (Worker nuke)</option>
-    <option value="both" selected>CPU & GPU (max crash chance)</option>
-  </select>
-  <button id="start" onclick="startStress()">START OVERLOAD</button>
-  <button id="stop" onclick="stopStress()">STOP (maybe)</button>
-  <div id="stats">Status: Idle | FPS: -- | Load: --%</div>
-</div>
+    <div class="max-w-4xl mx-auto bg-gray-900/70 backdrop-blur-lg border border-neon-green/30 rounded-2xl p-8 shadow-2xl">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div>
+          <label class="block text-lg font-semibold mb-2">Mode</label>
+          <select id="mode" class="w-full bg-gray-800 border border-neon-green/50 text-white p-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-neon-green">
+            <option value="gpu">GPU Only (Trig Hell)</option>
+            <option value="cpu">CPU Only (Worker Spam)</option>
+            <option value="both" selected>Both (Max Overload)</option>
+          </select>
+        </div>
+        <div class="flex flex-col justify-end">
+          <button id="start" onclick="startStress()" class="w-full py-6 bg-gradient-to-r from-neon-red to-red-600 hover:from-red-600 hover:to-neon-red text-white font-bold text-2xl rounded-xl shadow-lg transform hover:scale-105 transition">
+            START OVERLOAD
+          </button>
+        </div>
+        <div class="flex flex-col justify-end">
+          <button id="stop" onclick="stopStress()" class="w-full py-6 bg-gray-700 hover:bg-gray-600 text-white font-bold text-2xl rounded-xl shadow-lg transform hover:scale-105 transition hidden">
+            STOP (if alive)
+          </button>
+        </div>
+      </div>
 
-<canvas id="c"></canvas>
+      <div id="stats" class="text-center text-3xl font-mono text-neon-green mb-6">
+        Status: Idle | FPS: -- | 3D GPU Load: ~0%
+      </div>
 
-<script>
-// === WEBGL SETUP ===
-const canvas = document.getElementById('c');
-const gl = canvas.getContext('webgl2', {antialias:false, powerPreference:'high-performance'});
-if (!gl) alert('No WebGL2 — your PC is pussy anyway');
+      <div class="w-full bg-gray-800 rounded-full h-6 overflow-hidden mb-4">
+        <div id="loadBar" class="bg-gradient-to-r from-neon-green to-cyan-400 h-full w-0 transition-all duration-300"></div>
+      </div>
+    </div>
+  </div>
 
-canvas.width = window.innerWidth * 1.5; // oversize for more load
-canvas.height = window.innerHeight * 1.5;
-window.addEventListener('resize', () => { canvas.width = innerWidth*1.5; canvas.height = innerHeight*1.5; gl.viewport(0,0,canvas.width,canvas.height); });
+  <canvas id="c" class="fixed inset-0 z-0 pointer-events-none"></canvas>
 
-// Passthrough VS
-const vs = `#version 300 es
-in vec2 p; void main(){gl_Position=vec4(p,0,1);}`;
+  <script>
+    const canvas = document.getElementById('c');
+    const gl = canvas.getContext('webgl2', {antialias: false, powerPreference: 'high-performance'});
+    if (!gl) alert('No WebGL2 — your PC is too weak for real stress lol');
 
-// Evil FS: high-step raymarch + extra compute
-const fs = `#version 300 es
-precision highp float;
-out vec4 o;
-uniform vec2 r;
-uniform float t;
-uniform float load; // intensity fake
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    });
 
-float n(vec3 p){return fract(sin(dot(p,vec3(12.9898,78.233,45.5432)))*43758.5453);}
-float fbm(vec3 p){float a=0.5,f=0.; for(int i=0;i<15;i++){a*=0.5; f+=a*n(p); p*=2.1;} return f;}
-vec3 scene(vec3 p){return vec3(fbm(p*3.+t*0.5)*5., sin(p.x+t)*2., cos(p.z+t*1.2)*3.);}
+    // Vertex shader
+    const vsSource = `#version 300 es
+    in vec2 p; void main(){gl_Position=vec4(p,0,1);}`;
 
-void main(){
-  vec2 uv=(gl_FragCoord.xy-r*0.5)/r.y;
-  vec3 ro=vec3(0,0,-5.+sin(t)*0.5), rd=normalize(vec3(uv,1.8));
-  vec3 col=vec3(0); float d=0.;
-  for(int i=0;i<int(1200.+load*800.);i++){
-    vec3 p=ro+rd*d;
-    vec3 dist=scene(p);
-    float h=length(dist)-2.5;
-    d+=max(0.05,h*0.6);
-    col+=vec3(1,0.6,0.3)*0.02*exp(-d*0.1)*fbm(p*10.+t*2.);
-    if(d>60.||h<0.001)break;
-  }
-  o=vec4(col*1.5+vec3(0.1),1);
-}`;
+    // Fragment shader — trigonometry overload (sin/cos/tan/atan everywhere)
+    const fsSource = `#version 300 es
+    precision highp float;
+    out vec4 o;
+    uniform vec2 r;
+    uniform float t;
+    uniform float load;
 
-let prog = gl.createProgram();
-[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs].forEach((s,i)=>{
-  let sh=gl.createShader(s[0]); gl.shaderSource(sh,s[1]); gl.compileShader(sh);
-  if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(sh));
-  gl.attachShader(prog,sh);
-});
-gl.linkProgram(prog); gl.useProgram(prog);
+    float trigNoise(vec3 p) {
+      return sin(p.x * 12.0 + t) * cos(p.y * 15.0 + t * 1.3) * tan(atan(p.z * 8.0) + t * 0.7) * 0.5 + 0.5;
+    }
 
-let buf=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,buf);
-gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-3,-3,3,-3,-3,3,3,3]),gl.STATIC_DRAW);
-let loc=gl.getAttribLocation(prog,'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+    float fbmTrig(vec3 p) {
+      float f = 0.0, a = 0.5;
+      for(int i = 0; i < 14; i++) {
+        f += a * trigNoise(p + vec3(sin(t * 0.4), cos(t * 0.6), tan(t * 0.2)));
+        p = p * 2.1 + vec3(sin(t), cos(t*1.1), atan(t));
+        a *= 0.48;
+      }
+      return f;
+    }
 
-let resU=gl.getUniformLocation(prog,'r'), timeU=gl.getUniformLocation(prog,'t'), loadU=gl.getUniformLocation(prog,'load');
+    void main() {
+      vec2 uv = (gl_FragCoord.xy - r*0.5) / r.y;
+      vec3 ro = vec3(sin(t*0.3)*2.0, cos(t*0.4)*1.5, -4.0 + tan(t*0.1)*0.5);
+      vec3 rd = normalize(vec3(uv * 1.6, 1.0 + sin(t*0.2)*0.3));
 
-// Workers for CPU
-let workers=[];
-function cpuNuke(){
-  const blob = new Blob(["onmessage=()=>{let i=2;while(true){let p=true;for(let j=2;j<i;j++)if(i%j===0)p=false;if(p)postMessage(i);i++;}}"], {type:'text/javascript'});
-  const url=URL.createObjectURL(blob);
-  for(let i=0;i<(navigator.hardwareConcurrency||8)*2;i++){ // double for max fuck
-    let w=new Worker(url); workers.push(w);
-  }
-}
+      vec3 col = vec3(0.0);
+      float d = 0.0;
+      int steps = int(900.0 + load * 1200.0); // trig math kills perf
 
-// Render loop
-let running=false, st=0, anim;
-function loop(now){
-  if(!running)return;
-  const elapsed=(now-st)/1000;
-  gl.uniform2f(resU,canvas.width,canvas.height);
-  gl.uniform1f(timeU,elapsed);
-  gl.uniform1f(loadU, document.getElementById('mode').value==='gpu'||document.getElementById('mode').value==='both' ? 10 : 2);
-  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+      for(int i = 0; i < steps; i++) {
+        vec3 p = ro + rd * d;
+        float dens = fbmTrig(p * 3.0) * 4.0 - 2.0;
+        d += max(0.04, abs(dens) * 0.3 + sin(d * 5.0 + t) * 0.1);
 
-  const fps=Math.round(1000/(now-(window.last||now))); window.last=now;
-  document.getElementById('stats').textContent=`Running | FPS: ${fps} (dropping soon) | Load: 100%+ (pray no crash)`;
+        vec3 light = normalize(vec3(sin(t), cos(t*1.2), tan(t*0.8)));
+        float diff = max(0.0, dot(normalize(vec3(cos(p.x), sin(p.y), tan(p.z))), light));
+        col += vec3(0.8, 0.4 + sin(t)*0.3, 1.0) * diff * 0.03 * exp(-d*0.08);
 
-  anim=requestAnimationFrame(loop);
-}
+        if(d > 50.0) break;
+      }
+      o = vec4(col * 1.8 + vec3(0.15 * sin(t*3.0)), 1.0);
+    }`;
 
-function startStress(){
-  document.getElementById('start').style.display='none';
-  document.getElementById('stop').style.display='inline';
+    let program = gl.createProgram();
+    [gl.VERTEX_SHADER, vsSource].forEach((src, i) => {
+      let sh = gl.createShader(i === 0 ? gl.VERTEX_SHADER : gl.FRAGMENT_SHADER);
+      gl.shaderSource(sh, src); gl.compileShader(sh);
+      gl.attachShader(program, sh);
+    });
+    gl.linkProgram(program); gl.useProgram(program);
 
-  canvas.requestFullscreen().catch(e=>console.log('No fullscreen',e));
-  document.body.requestPointerLock?.();
+    let buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-3,-3,3,-3,-3,3,3,3]), gl.STATIC_DRAW);
+    let posLoc = gl.getAttribLocation(program, 'p');
+    gl.enableVertexAttribArray(posLoc); gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-  running=true; st=performance.now();
-  requestAnimationFrame(loop);
+    let resLoc = gl.getUniformLocation(program, 'r');
+    let timeLoc = gl.getUniformLocation(program, 't');
+    let loadLoc = gl.getUniformLocation(program, 'load');
 
-  const m=document.getElementById('mode').value;
-  if(m==='cpu'||m==='both') cpuNuke();
-}
+    let running = false, startT = 0, animId, workers = [];
 
-function stopStress(){
-  running=false; cancelAnimationFrame(anim);
-  document.getElementById('start').style.display='inline';
-  document.getElementById('stop').style.display='none';
-  workers.forEach(w=>w.terminate()); workers=[];
-  document.exitFullscreen?.(); document.exitPointerLock?.();
-}
-</script>
+    function render(now) {
+      if (!running) return;
+      let elapsed = (now - startT) / 1000;
+
+      gl.uniform2f(resLoc, canvas.width, canvas.height);
+      gl.uniform1f(timeLoc, elapsed);
+      gl.uniform1f(loadLoc, document.getElementById('mode').value === 'gpu' || document.getElementById('mode').value === 'both' ? 10 : 1);
+
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+      let fps = Math.round(1000 / (now - (window.lastFrame || now)));
+      window.lastFrame = now;
+      let loadPct = Math.min(100, Math.floor(fps < 20 ? 100 : 60 + (40 * (1 - fps/60))));
+      document.getElementById('stats').textContent = `Running | FPS: ${fps} | 3D GPU Load: ~${loadPct}%`;
+      document.getElementById('loadBar').style.width = `${loadPct}%`;
+
+      animId = requestAnimationFrame(render);
+    }
+
+    function startStress() {
+      document.getElementById('start').classList.add('hidden');
+      document.getElementById('stop').classList.remove('hidden');
+
+      canvas.requestFullscreen?.().catch(()=>{});
+      document.body.requestPointerLock?.();
+
+      running = true;
+      startT = performance.now();
+      requestAnimationFrame(render);
+
+      if (document.getElementById('mode').value !== 'gpu') {
+        const blob = new Blob([`onmessage=()=>{while(true){let x=0; for(let i=2;i<1e9;i++) x+=Math.sin(i)*Math.cos(i*1.1)*Math.tan(i*0.7); postMessage(x);}}`], {type:'text/javascript'});
+        for (let i = 0; i < (navigator.hardwareConcurrency * 2 || 16); i++) {
+          workers.push(new Worker(URL.createObjectURL(blob)));
+        }
+      }
+    }
+
+    function stopStress() {
+      running = false;
+      cancelAnimationFrame(animId);
+      document.getElementById('start').classList.remove('hidden');
+      document.getElementById('stop').classList.add('hidden');
+      workers.forEach(w => w.terminate()); workers = [];
+      document.exitFullscreen?.(); document.exitPointerLock?.();
+    }
+  </script>
 </body>
 </html>
