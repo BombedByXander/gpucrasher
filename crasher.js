@@ -15,18 +15,25 @@ let textures = [];
 let framebuffers = [];
 let ramArrays = [];
 
-// Intensity scaling
+// Intensity + Mobile scaling
+function isMobile() { return window.mobileMode === true; }
+
+function getResolutionScale() { return isMobile() ? 1.5 : 4.0; }
 function getMarchSteps() {
-  return Math.floor(50 + (420 - 50) * ((window.intensity || 10) / 10));
+  const base = isMobile() ? 180 : 420;
+  return Math.floor(50 + (base - 50) * ((window.intensity || 10) / 10));
 }
-
 function getTrigLoops() {
-  return Math.floor(20 + (110 - 20) * ((window.intensity || 10) / 10));
+  const base = isMobile() ? 50 : 110;
+  return Math.floor(20 + (base - 20) * ((window.intensity || 10) / 10));
 }
-
 function getBombCount() {
-  return 4 + Math.floor(12 * ((window.intensity || 10) / 10)); // 4→16 textures
+  return isMobile() ? 2 + Math.floor(2 * ((window.intensity || 10) / 10)) : 4 + Math.floor(12 * ((window.intensity || 10) / 10));
 }
+function getBombSize() { return isMobile() ? 4096 : 8192; }
+function getBombFormat() { return isMobile() ? gl.RGBA16F : gl.RGBA32F; }
+function getRamArrayCount() { return isMobile() ? 4 : 8; }
+function getBombCycleMod() { return isMobile() ? 10 : 3; }
 
 // ──────────────────────────────────────────────
 function ensureStatusTimer() {
@@ -62,11 +69,10 @@ function setIdle() {
   if (animFrameId) cancelAnimationFrame(animFrameId);
   animFrameId = null;
 
-  // Cleanup bombs
-  textures.forEach(t => { if (t) gl.deleteTexture(t); });
-  framebuffers.forEach(f => { if (f) gl.deleteFramebuffer(f); });
+  textures.forEach(t => { if (t) gl?.deleteTexture(t); });
+  framebuffers.forEach(f => { if (f) gl?.deleteFramebuffer(f); });
   textures = []; framebuffers = [];
-  ramArrays = []; // let GC eat the JS RAM bomb
+  ramArrays = [];
 
   ensureStatusTimer();
   if (statusEl) statusEl.textContent = "Idle – ready to burn";
@@ -75,12 +81,13 @@ function setIdle() {
 
 function createVRAMBomb() {
   const count = getBombCount();
-  const size = 8192;
+  const size = getBombSize();
+  const format = getBombFormat();
 
   for (let i = 0; i < count; i++) {
     const tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, size, size); // immutable + float32
+    gl.texStorage2D(gl.TEXTURE_2D, 1, format, size, size);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
@@ -92,12 +99,12 @@ function createVRAMBomb() {
     framebuffers.push(fb);
   }
 
-  // Bonus system RAM bomb (Float32Arrays)
-  for (let i = 0; i < 8; i++) {
-    ramArrays.push(new Float32Array(1024 * 1024 * 64)); // ~256MB each ×8 = 2GB+
+  // JS RAM bomb
+  for (let i = 0; i < getRamArrayCount(); i++) {
+    ramArrays.push(new Float32Array(1024 * 1024 * 64));
   }
 
-  console.log(`💥 VRAM Bomber armed: ${count} × 8192² RGBA32F + JS RAM arrays`);
+  console.log(`💥 Bomber: ${count}×${size}² ${isMobile() ? 'RGBA16F' : 'RGBA32F'} + ${getRamArrayCount()} JS arrays`);
 }
 
 function createWebGLContext() {
@@ -106,7 +113,7 @@ function createWebGLContext() {
   canvas.style.position = 'fixed'; canvas.style.inset = '0'; canvas.style.zIndex = '-999'; canvas.style.pointerEvents = 'none';
   document.body.appendChild(canvas);
 
-  const scale = 4.0;
+  const scale = getResolutionScale();
   canvas.width = window.innerWidth * scale;
   canvas.height = window.innerHeight * scale;
 
@@ -117,7 +124,6 @@ function createWebGLContext() {
     return false;
   }
 
-  // ───── VRAM BOMBER ─────
   createVRAMBomb();
 
   const vsSource = `#version 300 es\nin vec2 a_position;\nvoid main(){gl_Position=vec4(a_position,0.0,1.0);}`;
@@ -160,7 +166,6 @@ function createWebGLContext() {
       fragColor = vec4(col, 1.0);
     }`;
 
-  // shader compile + program setup (same as before, skipped for brevity but it's identical)
   const vs = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vs, vsSource); gl.compileShader(vs);
   const fs = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(fs, fsSource); gl.compileShader(fs);
   if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS) || !gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
@@ -195,22 +200,22 @@ function render(now) {
   gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
   gl.uniform1f(gl.getUniformLocation(program, 'u_time'), (now - startTime) / 1000);
 
-  // Main screen render
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  // 🔥 VRAM BOMB CYCLE 🔥
-  if (frameCount % 3 === 0 && framebuffers.length > 0) {
+  // VRAM bomb cycle
+  if (frameCount % getBombCycleMod() === 0 && framebuffers.length > 0) {
     const idx = frameCount % framebuffers.length;
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[idx]);
-    gl.drawArrays(gl.TRIANGLES, 0, 6); // render to huge texture
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
   frameCount++;
   if (frameCount % 8 === 0) {
     const fps = Math.round(1000 / (now - lastFrameTime)) || 0;
     ensureStatusTimer();
-    if (statusEl) statusEl.textContent = `NUKING LVL ${window.intensity || 10} • ${textures.length}×256MB textures • ${fps} FPS`;
+    const modeText = isMobile() ? "Mobile Nuke Mode" : "Desktop Nuke Mode";
+    if (statusEl) statusEl.textContent = `${modeText} LVL ${window.intensity || 10} • ${textures.length} textures • ${fps} FPS`;
     lastFrameTime = now;
   }
 
@@ -219,13 +224,19 @@ function render(now) {
 }
 
 function startNuke() {
-  if (isRunning) { setIdle(); ensureStatusTimer(); if (statusEl) statusEl.textContent = "Stopped – you survived... this time"; return; }
+  if (isRunning) {
+    setIdle();
+    ensureStatusTimer();
+    if (statusEl) statusEl.textContent = "Stopped – you survived... this time";
+    return;
+  }
 
   isRunning = true;
   if (crashBtn) crashBtn.textContent = "STOP NUKING";
 
   ensureStatusTimer();
-  if (statusEl) statusEl.textContent = `VRAM + Shader nuke @ Level ${window.intensity || 10} — fans about to die`;
+  const modeText = isMobile() ? "Mobile" : "Full";
+  if (statusEl) statusEl.textContent = `${modeText} VRAM + Shader nuke @ Level ${window.intensity || 10}`;
 
   if (!createWebGLContext()) { setIdle(); return; }
 
@@ -243,15 +254,17 @@ document.addEventListener('DOMContentLoaded', () => {
   crashBtn.onclick = startNuke;
 
   window.addEventListener('resize', () => {
-    if (canvas) {
-      const scale = 4.0;
+    if (canvas && gl) {
+      const scale = getResolutionScale();
       canvas.width = window.innerWidth * scale;
       canvas.height = window.innerHeight * scale;
-      if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.viewport(0, 0, canvas.width, canvas.height);
     }
   });
 
-  try { worker = new Worker(URL.createObjectURL(new Blob([`onmessage=e=>e.data[0]==="ping"&&postMessage(["pong"])`], {type:'text/javascript'}))); } catch(e){}
+  try {
+    worker = new Worker(URL.createObjectURL(new Blob([`onmessage=e=>e.data[0]==="ping"&&postMessage(["pong"])`], {type:'text/javascript'})));
+  } catch(e){}
 
   setIdle();
 });
