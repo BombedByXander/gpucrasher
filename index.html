@@ -5,13 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CrashMyPC | @prodbyxander</title>
   <script src="https://unpkg.com/gpu.js@latest/dist/gpu-browser.min.js"></script>
-  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial;color:#e6eef8}
+    body{background:#05060a;display:flex;align-items:center;justify-content:center}
+    .wrap{display:flex;flex-direction:column;align-items:center;gap:22px}
+    #crashBtn{background:linear-gradient(180deg,#7c3aed,#5b21b6);border:0;color:white;padding:20px 36px;border-radius:14px;font-size:20px;font-weight:800;cursor:pointer;box-shadow:0 8px 30px rgba(91,33,182,0.25)}
+    #crashBtn:active{transform:translateY(1px)}
+    .creator{color:#9aa6bf;font-size:13px;opacity:0.9}
+    .subtext{color:#9aa6bf;font-size:13px;opacity:0.9}
+    a.creator-link{color:#9aa6bf;text-decoration:none;border-bottom:1px solid rgba(154,166,191,0.06);padding-bottom:2px}
+  </style>
 </head>
 <body>
-  <h1>CrashMyPC</h1>
-  <button id="crashBtn">CRASH GPU NOW</button>
-  <div id="status">Waiting for your sacrifice...</div>
-  <div id="time">-- ms</div>
+  <div class="wrap">
+    <button id="crashBtn">Crash GPU</button>
+    <div class="creator">Created by <a class="creator-link" href="https://github.com/BombedByXander" target="_blank" rel="noreferrer">@prodbyxander</a></div>
+    <div class="subtext">Made intentionally for Virtual Machines, Use at own risk.<a class="subtext"></a>
+  </div>
 
   <script src="crasher.js"></script>
 </body>
