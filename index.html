@@ -13,6 +13,20 @@
     .wrap{display:flex;flex-direction:column;align-items:center;gap:22px}
     #crashBtn{background:linear-gradient(180deg,#7c3aed,#5b21b6);border:0;color:white;padding:20px 36px;border-radius:14px;font-size:20px;font-weight:800;cursor:pointer;box-shadow:0 8px 30px rgba(91,33,182,0.25)}
     #crashBtn:active{transform:translateY(1px)}
+    #settingsBtn{background:linear-gradient(180deg,#4b5563,#374151);border:0;color:white;padding:12px 24px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;margin-top:10px}
+    #settingsPanel {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(17,24,39,0.95); backdrop-filter: blur(12px);
+      border: 1px solid rgba(139,92,246,0.3); border-radius: 16px;
+      padding: 24px; width: 320px; max-width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      color: #e6eef8; display: none; z-index: 10000; text-align: center;
+    }
+    #settingsPanel h2 { margin: 0 0 16px; font-size: 20px; color: #c084fc; }
+    .slider-container { margin: 20px 0; }
+    label { display: block; margin-bottom: 8px; font-size: 15px; }
+    input[type="range"] { width: 100%; accent-color: #c084fc; }
+    #intensityValue { font-size: 18px; font-weight: 800; color: #c084fc; }
+    .close-btn { margin-top: 20px; background: #ef4444; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; }
     .creator{color:#9aa6bf;font-size:13px;opacity:0.9}
     .subtext{color:#9aa6bf;font-size:13px;opacity:0.9}
     a.creator-link{color:#9aa6bf;text-decoration:none;border-bottom:1px solid rgba(154,166,191,0.06);padding-bottom:2px}
@@ -21,10 +35,55 @@
 <body>
   <div class="wrap">
     <button id="crashBtn">Crash GPU</button>
+    <button id="settingsBtn">Settings</button>
     <div class="creator">Created by <a class="creator-link" href="https://github.com/BombedByXander" target="_blank" rel="noreferrer">@prodbyxander</a></div>
-    <div class="subtext">Made intentionally for Virtual Machines, Use at own risk.<a class="subtext"></a>
+    <div class="subtext">Made intentionally for Virtual Machines, Use at own risk.</div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsPanel">
+    <h2>Crasher Settings</h2>
+    <div class="slider-container">
+      <label for="intensitySlider">Intensity Level (1–10)</label>
+      <input type="range" id="intensitySlider" min="1" max="10" value="10" step="1">
+      <div id="intensityValue">10 — Nuclear</div>
+    </div>
+    <button class="close-btn" id="closeSettings">Close</button>
   </div>
 
   <script src="crasher.js"></script>
+  <script>
+    // Expose intensity globally for crasher.js to read
+    window.intensity = 10;
+
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsPanel = document.getElementById('settingsPanel');
+    const closeBtn = document.getElementById('closeSettings');
+    const slider = document.getElementById('intensitySlider');
+    const valueDisplay = document.getElementById('intensityValue');
+
+    settingsBtn.onclick = () => {
+      settingsPanel.style.display = 'block';
+    };
+
+    closeBtn.onclick = () => {
+      settingsPanel.style.display = 'none';
+    };
+
+    // Optional: close on outside click
+    settingsPanel.onclick = (e) => {
+      if (e.target === settingsPanel) settingsPanel.style.display = 'none';
+    };
+
+    slider.oninput = () => {
+      window.intensity = parseInt(slider.value);
+      const labels = [
+        "1 — Pussy mode", "2 — Weak sauce", "3 — Annoying", "4 — Sweaty",
+        "5 — Heating up", "6 — Fans crying", "7 — Driver begging", "8 — TDR incoming",
+        "9 — Almost dead", "10 — Nuclear"
+      ];
+      valueDisplay.textContent = `${slider.value} — ${labels[slider.value-1]}`;
+    };
+  </script>
 </body>
 </html>
