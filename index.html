@@ -22,10 +22,17 @@
       color: #e6eef8; display: none; z-index: 10000; text-align: center;
     }
     #settingsPanel h2 { margin: 0 0 16px; font-size: 20px; color: #c084fc; }
-    .slider-container { margin: 20px 0; }
+    .slider-container, .toggle-container { margin: 20px 0; }
     label { display: block; margin-bottom: 8px; font-size: 15px; }
     input[type="range"] { width: 100%; accent-color: #c084fc; }
     #intensityValue { font-size: 18px; font-weight: 800; color: #c084fc; }
+    .toggle { display: flex; align-items: center; justify-content: space-between; font-size: 15px; }
+    .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider-toggle { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #374151; transition: .4s; border-radius: 24px; }
+    .slider-toggle:before { position: absolute; content: ""; height: 20px; width: 20px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider-toggle { background-color: #c084fc; }
+    input:checked + .slider-toggle:before { transform: translateX(26px); }
     .close-btn { margin-top: 20px; background: #ef4444; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; }
     .creator{color:#9aa6bf;font-size:13px;opacity:0.9}
     .subtext{color:#9aa6bf;font-size:13px;opacity:0.9}
@@ -48,42 +55,50 @@
       <input type="range" id="intensitySlider" min="1" max="10" value="10" step="1">
       <div id="intensityValue">10 — Nuclear</div>
     </div>
+    <div class="toggle-container">
+      <div class="toggle">
+        <span>Mobile Mode (safer for phones)</span>
+        <label class="switch">
+          <input type="checkbox" id="mobileToggle" checked>
+          <span class="slider-toggle"></span>
+        </label>
+      </div>
+    </div>
     <button class="close-btn" id="closeSettings">Close</button>
   </div>
 
   <script src="crasher.js"></script>
   <script>
-    // Expose intensity globally for crasher.js to read
+    // Expose globals for crasher.js
     window.intensity = 10;
+    window.mobileMode = true; // default on for phones
 
     const settingsBtn = document.getElementById('settingsBtn');
     const settingsPanel = document.getElementById('settingsPanel');
     const closeBtn = document.getElementById('closeSettings');
-    const slider = document.getElementById('intensitySlider');
-    const valueDisplay = document.getElementById('intensityValue');
+    const intensitySlider = document.getElementById('intensitySlider');
+    const intensityValue = document.getElementById('intensityValue');
+    const mobileToggle = document.getElementById('mobileToggle');
 
-    settingsBtn.onclick = () => {
-      settingsPanel.style.display = 'block';
+    settingsBtn.onclick = () => { settingsPanel.style.display = 'block'; };
+    closeBtn.onclick = () => { settingsPanel.style.display = 'none'; };
+    settingsPanel.onclick = (e) => { if (e.target === settingsPanel) settingsPanel.style.display = 'none'; };
+
+    intensitySlider.oninput = () => {
+      window.intensity = parseInt(intensitySlider.value);
+      const labels = ["1 — Pussy mode", "2 — Weak sauce", "3 — Annoying", "4 — Sweaty", "5 — Heating up", "6 — Fans crying", "7 — Driver begging", "8 — TDR incoming", "9 — Almost dead", "10 — Nuclear"];
+      intensityValue.textContent = `${intensitySlider.value} — ${labels[intensitySlider.value-1]}`;
     };
 
-    closeBtn.onclick = () => {
-      settingsPanel.style.display = 'none';
+    mobileToggle.onchange = () => {
+      window.mobileMode = mobileToggle.checked;
     };
 
-    // Optional: close on outside click
-    settingsPanel.onclick = (e) => {
-      if (e.target === settingsPanel) settingsPanel.style.display = 'none';
-    };
-
-    slider.oninput = () => {
-      window.intensity = parseInt(slider.value);
-      const labels = [
-        "1 — Pussy mode", "2 — Weak sauce", "3 — Annoying", "4 — Sweaty",
-        "5 — Heating up", "6 — Fans crying", "7 — Driver begging", "8 — TDR incoming",
-        "9 — Almost dead", "10 — Nuclear"
-      ];
-      valueDisplay.textContent = `${slider.value} — ${labels[slider.value-1]}`;
-    };
+    // Auto-enable mobile mode on small screens
+    if (window.innerWidth <= 768 || /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      mobileToggle.checked = true;
+      window.mobileMode = true;
+    }
   </script>
 </body>
 </html>
