@@ -59,8 +59,6 @@ function setIdle() {
     cancelAnimationFrame(animFrameId);
     animFrameId = null;
   }
-  document.exitFullscreen?.().catch(() => {});
-  document.exitPointerLock?.();
   ensureStatusTimer();
   if (statusEl) statusEl.textContent = "Idle – ready to burn";
   if (timeEl) timeEl.textContent = formatTime(0);
@@ -76,7 +74,7 @@ function createWebGLContext() {
   canvas.style.pointerEvents = 'none';
   document.body.appendChild(canvas);
 
-  const scale = 4.5; // cranked up a bit more
+  const scale = 4.0;
   canvas.width = window.innerWidth * scale;
   canvas.height = window.innerHeight * scale;
 
@@ -106,39 +104,39 @@ function createWebGLContext() {
     float trigHell(vec3 p) {
       float v = 0.0;
       float amp = 1.0;
-      for (int i = 0; i < 130; i++) { // increased to 130 layers
-        v += amp * sin(p.x * 14.2 + u_time * 2.6);
-        v += amp * cos(p.y * 18.1 + u_time * 3.0);
-        v += amp * tan(atan(p.z * 11.5 + u_time * 1.8) * 1.5);
-        v += amp * sin(cos(tan(v * 4.5)) * 5.8);
+      for (int i = 0; i < 110; i++) {
+        v += amp * sin(p.x * 13.7 + u_time * 2.4);
+        v += amp * cos(p.y * 16.9 + u_time * 2.8);
+        v += amp * tan(atan(p.z * 10.3 + u_time * 1.6) * 1.4);
+        v += amp * sin(cos(tan(v * 4.1)) * 5.3);
         v = fract(v * 1.6180339887);
-        amp *= 0.37;
-        p += vec3(sin(u_time * 1.0), cos(u_time * 1.5), tan(u_time * 0.9));
+        amp *= 0.39;
+        p += vec3(sin(u_time * 0.9), cos(u_time * 1.3), tan(u_time * 0.7));
       }
       return v;
     }
 
     void main() {
       vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
-      vec3 ro = vec3(sin(u_time * 0.9) * 5.5, cos(u_time * 1.1) * 4.5, -11.0);
-      vec3 rd = normalize(vec3(uv * 2.4, 2.0 + sin(u_time * 0.6) * 0.6));
+      vec3 ro = vec3(sin(u_time * 0.8) * 5.0, cos(u_time * 1.0) * 4.0, -10.0);
+      vec3 rd = normalize(vec3(uv * 2.2, 1.9 + sin(u_time * 0.5) * 0.5));
 
       float dist = 0.0;
       float accum = 0.0;
 
-      for (int i = 0; i < 500; i++) { // 500 steps now
+      for (int i = 0; i < 420; i++) {
         vec3 p = ro + rd * dist;
-        float density = abs(trigHell(p * 4.2 + u_time * 1.8)) * 0.14;
-        accum += density * exp(-dist * 0.02);
-        accum += sin(dist * 25.0 + u_time * 8.0) * cos(dist * 18.0) * 0.04;
-        dist += max(0.06, density * 0.48);
-        if (dist > 90.0 || accum > 12.0) break;
+        float density = abs(trigHell(p * 3.8 + u_time * 1.6)) * 0.12;
+        accum += density * exp(-dist * 0.018);
+        accum += sin(dist * 22.0 + u_time * 7.0) * cos(dist * 15.0) * 0.035;
+        dist += max(0.05, density * 0.42);
+        if (dist > 80.0 || accum > 10.0) break;
       }
 
       vec3 col = 0.5 + 0.5 * vec3(
-        sin(accum * 5.5 + u_time * 2.7),
-        cos(accum * 7.2 + u_time * 2.4),
-        tan(accum * 5.1 + u_time * 1.4)
+        sin(accum * 5.1 + u_time * 2.4),
+        cos(accum * 6.8 + u_time * 2.1),
+        tan(accum * 4.7 + u_time * 1.2)
       );
 
       fragColor = vec4(col, 1.0);
@@ -194,9 +192,6 @@ function render(now) {
   gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
   gl.uniform1f(gl.getUniformLocation(program, 'u_time'), (now - startTime) / 1000);
 
-  // Draw multiple times per frame to force more work before throttle
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   frameCount++;
@@ -215,7 +210,7 @@ function render(now) {
 
 function startNuke() {
   if (isRunning) {
-    // Toggle stop
+    // If already running → treat as stop
     setIdle();
     ensureStatusTimer();
     if (statusEl) statusEl.textContent = "Stopped – you survived... this time";
@@ -226,7 +221,7 @@ function startNuke() {
 
   isRunning = true;
   if (crashBtn) {
-    crashBtn.disabled = false;
+    crashBtn.disabled = false; // allow clicking to stop
     crashBtn.textContent = "Stop Crashing";
   }
   if (stopBtn) stopBtn.style.display = 'inline-block';
@@ -235,22 +230,19 @@ function startNuke() {
   if (statusEl) statusEl.textContent = "Nuking GPU – hold on tight";
   if (timeEl) timeEl.textContent = formatTime(0);
 
-  // Anti-throttle tricks
-  canvas.requestFullscreen?.().catch(() => {});
-  canvas.requestPointerLock?.().catch(() => {});
-
   if (!createWebGLContext()) {
     setIdle();
     return;
   }
 
-  startTime = performance.now();  // timer starts HERE on click
+  startTime = performance.now();  // ← timer starts RIGHT HERE when button is pressed
   frameCount = 0;
   lastFrameTime = startTime;
   requestAnimationFrame(render);
 }
 
 // ──────────────────────────────────────────────
+// Wait for DOM
 document.addEventListener('DOMContentLoaded', () => {
   crashBtn = document.getElementById('crashBtn');
   stopBtn  = document.getElementById('stopBtn');
@@ -290,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Resize handling
   window.addEventListener('resize', () => {
     if (canvas) {
-      const scale = 4.5;
+      const scale = 4.0;
       canvas.width = window.innerWidth * scale;
       canvas.height = window.innerHeight * scale;
       if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
