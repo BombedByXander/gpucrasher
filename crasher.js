@@ -51,7 +51,10 @@ function formatTime(ms) {
 
 function setIdle() {
   isRunning = false;
-  if (crashBtn) crashBtn.disabled = false;
+  if (crashBtn) {
+    crashBtn.disabled = false;
+    crashBtn.textContent = "CRASH GPU NOW";
+  }
   if (animFrameId) {
     cancelAnimationFrame(animFrameId);
     animFrameId = null;
@@ -71,7 +74,7 @@ function createWebGLContext() {
   canvas.style.pointerEvents = 'none';
   document.body.appendChild(canvas);
 
-  const scale = 4.0; // increased — more pixels = more fragment shader executions
+  const scale = 4.0;
   canvas.width = window.innerWidth * scale;
   canvas.height = window.innerHeight * scale;
 
@@ -88,12 +91,10 @@ function createWebGLContext() {
     return false;
   }
 
-  // Vertex shader
   const vsSource = `#version 300 es
     in vec2 a_position;
     void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
 
-  // Fragment shader — beefed up trig + iterations
   const fsSource = `#version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -103,7 +104,7 @@ function createWebGLContext() {
     float trigHell(vec3 p) {
       float v = 0.0;
       float amp = 1.0;
-      for (int i = 0; i < 110; i++) { // 110 trig layers — very heavy
+      for (int i = 0; i < 110; i++) {
         v += amp * sin(p.x * 13.7 + u_time * 2.4);
         v += amp * cos(p.y * 16.9 + u_time * 2.8);
         v += amp * tan(atan(p.z * 10.3 + u_time * 1.6) * 1.4);
@@ -123,7 +124,7 @@ function createWebGLContext() {
       float dist = 0.0;
       float accum = 0.0;
 
-      for (int i = 0; i < 420; i++) { // 420 steps — insane load
+      for (int i = 0; i < 420; i++) {
         vec3 p = ro + rd * dist;
         float density = abs(trigHell(p * 3.8 + u_time * 1.6)) * 0.12;
         accum += density * exp(-dist * 0.018);
@@ -170,7 +171,6 @@ function createWebGLContext() {
 
   gl.useProgram(program);
 
-  // Quad
   const buffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
@@ -209,9 +209,21 @@ function render(now) {
 }
 
 function startNuke() {
-  if (isRunning) return;
+  if (isRunning) {
+    // If already running → treat as stop
+    setIdle();
+    ensureStatusTimer();
+    if (statusEl) statusEl.textContent = "Stopped – you survived... this time";
+    if (timeEl) timeEl.textContent = '--:--.---';
+    if (stopBtn) stopBtn.style.display = 'none';
+    return;
+  }
+
   isRunning = true;
-  if (crashBtn) crashBtn.disabled = true;
+  if (crashBtn) {
+    crashBtn.disabled = false; // allow clicking to stop
+    crashBtn.textContent = "Stop Crashing";
+  }
   if (stopBtn) stopBtn.style.display = 'inline-block';
 
   ensureStatusTimer();
@@ -223,7 +235,7 @@ function startNuke() {
     return;
   }
 
-  startTime = performance.now();
+  startTime = performance.now();  // ← timer starts RIGHT HERE when button is pressed
   frameCount = 0;
   lastFrameTime = startTime;
   requestAnimationFrame(render);
@@ -253,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (statusEl) statusEl.textContent = "Stopped – you survived... this time";
       if (timeEl) timeEl.textContent = '--:--.---';
       if (stopBtn) stopBtn.style.display = 'none';
+      if (crashBtn) crashBtn.textContent = "CRASH GPU NOW";
     };
   }
 
