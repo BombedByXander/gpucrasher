@@ -1,4 +1,3 @@
-// ─── YOUR ORIGINAL CODE - CRANKED UP ──────────────────────
 let worker = null;
 let isRunning = false;
 
@@ -15,21 +14,29 @@ let animFrameId = null;
 let frameCount = 0;
 let lastFrameTime = 0;
 
-// ─── CRANKED UP CONFIG ──────────────────────────────────
-const CRANK = {
-  shaderLoops: 150,        // was 110
-  raymarchSteps: 500,      // was 420
-  renderPasses: 6,         // was 1 (MULTIPLE PASSES)
-  resolutionScale: 5.0     // was 4.0
-};
-
 // ──────────────────────────────────────────────
 function ensureStatusTimer() {
   if (!statusEl) {
-    statusEl = document.getElementById('statusText');
+    statusEl = document.createElement('div');
+    statusEl.id = 'status';
+    Object.assign(statusEl.style, {
+      position: 'fixed', top: '18px', left: '50%', transform: 'translateX(-50%)',
+      background: 'rgba(0,0,0,0.7)', color: '#dbeafe', padding: '10px 16px',
+      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
+      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
+    });
+    document.body.appendChild(statusEl);
   }
   if (!timeEl) {
-    timeEl = document.getElementById('timeValue');
+    timeEl = document.createElement('div');
+    timeEl.id = 'time';
+    Object.assign(timeEl.style, {
+      position: 'fixed', top: '60px', left: '50%', transform: 'translateX(-50%)',
+      background: 'rgba(0,0,0,0.65)', color: '#d1fae5', padding: '8px 14px',
+      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
+      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
+    });
+    document.body.appendChild(timeEl);
   }
 }
 
@@ -46,44 +53,15 @@ function setIdle() {
   isRunning = false;
   if (crashBtn) {
     crashBtn.disabled = false;
-    crashBtn.className = 'crash-btn';
-    document.querySelector('.crash-btn .icon').textContent = '⚡';
-    document.getElementById('btnLabel').textContent = 'Crash GPU';
+    crashBtn.textContent = "CRASH GPU NOW";
   }
-  if (stopBtn) stopBtn.style.display = 'none';
   if (animFrameId) {
     cancelAnimationFrame(animFrameId);
     animFrameId = null;
   }
   ensureStatusTimer();
-  if (statusEl) {
-    statusEl.textContent = 'Ready';
-    statusEl.style.color = '';
-  }
-  if (timeEl) timeEl.textContent = '00:00.000';
-  
-  // Reset FPS
-  const fpsEl = document.getElementById('fpsValue');
-  if (fpsEl) {
-    fpsEl.textContent = '--';
-    fpsEl.className = 'value';
-  }
-  const loadEl = document.getElementById('loadValue');
-  if (loadEl) {
-    loadEl.innerHTML = '0<span class="unit">%</span>';
-    loadEl.className = 'value';
-  }
-  const loadBar = document.getElementById('loadBar');
-  if (loadBar) loadBar.style.width = '0%';
-  const loadBarContainer = document.getElementById('loadBarContainer');
-  if (loadBarContainer) loadBarContainer.classList.remove('active');
-  
-  const badge = document.getElementById('statusBadge');
-  if (badge) {
-    badge.className = 'status-badge';
-    const dot = document.getElementById('statusDot');
-    if (dot) dot.style.background = '#22c55e';
-  }
+  if (statusEl) statusEl.textContent = "Idle – ready to burn";
+  if (timeEl) timeEl.textContent = formatTime(0);
 }
 
 function createWebGLContext() {
@@ -92,12 +70,11 @@ function createWebGLContext() {
   canvas = document.createElement('canvas');
   canvas.style.position = 'fixed';
   canvas.style.inset = '0';
-  canvas.style.zIndex = '-1';
+  canvas.style.zIndex = '-999';
   canvas.style.pointerEvents = 'none';
-  canvas.style.opacity = '0.6';
-  document.body.prepend(canvas);
+  document.body.appendChild(canvas);
 
-  const scale = CRANK.resolutionScale;
+  const scale = 4.0;
   canvas.width = window.innerWidth * scale;
   canvas.height = window.innerHeight * scale;
 
@@ -110,16 +87,14 @@ function createWebGLContext() {
 
   if (!gl) {
     ensureStatusTimer();
-    if (statusEl) statusEl.textContent = 'No WebGL!';
+    if (statusEl) statusEl.textContent = "No WebGL — your GPU is pussy";
     return false;
   }
 
-  // ─── VERTEX SHADER (YOUR ORIGINAL) ──────────────────
   const vsSource = `#version 300 es
     in vec2 a_position;
     void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
 
-  // ─── FRAGMENT SHADER (CRANKED UP) ──────────────────
   const fsSource = `#version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -129,7 +104,7 @@ function createWebGLContext() {
     float trigHell(vec3 p) {
       float v = 0.0;
       float amp = 1.0;
-      for (int i = 0; i < ${CRANK.shaderLoops}; i++) {
+      for (int i = 0; i < 110; i++) {
         v += amp * sin(p.x * 13.7 + u_time * 2.4);
         v += amp * cos(p.y * 16.9 + u_time * 2.8);
         v += amp * tan(atan(p.z * 10.3 + u_time * 1.6) * 1.4);
@@ -149,7 +124,7 @@ function createWebGLContext() {
       float dist = 0.0;
       float accum = 0.0;
 
-      for (int i = 0; i < ${CRANK.raymarchSteps}; i++) {
+      for (int i = 0; i < 420; i++) {
         vec3 p = ro + rd * dist;
         float density = abs(trigHell(p * 3.8 + u_time * 1.6)) * 0.12;
         accum += density * exp(-dist * 0.018);
@@ -178,7 +153,7 @@ function createWebGLContext() {
   if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS) || !gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
     console.error(gl.getShaderInfoLog(vs) || gl.getShaderInfoLog(fs));
     ensureStatusTimer();
-    if (statusEl) statusEl.textContent = 'Shader failed!';
+    if (statusEl) statusEl.textContent = "Shader died – GPU said fuck off";
     return false;
   }
 
@@ -190,7 +165,7 @@ function createWebGLContext() {
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     console.error(gl.getProgramInfoLog(program));
     ensureStatusTimer();
-    if (statusEl) statusEl.textContent = 'Link failed!';
+    if (statusEl) statusEl.textContent = "Link failed – program invalid";
     return false;
   }
 
@@ -213,67 +188,22 @@ function createWebGLContext() {
 function render(now) {
   if (!isRunning || !gl || !program) return;
 
-  const elapsed = (now - startTime) / 1000;
-  const heat = Math.min(100, (elapsed / 8) * 40 + 20 + Math.random() * 10);
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_time'), (now - startTime) / 1000);
 
-  // ─── MULTIPLE RENDER PASSES ──────────────────────────
-  for (let pass = 0; pass < CRANK.renderPasses; pass++) {
-    gl.viewport(0, 0, canvas.width, canvas.height);
-    gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
-    gl.uniform1f(gl.getUniformLocation(program, 'u_time'), elapsed + pass * 0.05);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-  }
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   frameCount++;
-
-  if (now - lastFrameTime > 200) {
-    const fps = Math.round(frameCount / ((now - lastFrameTime) / 1000));
-    const load = Math.min(100, Math.round((1 - fps / 60) * 100 + 20));
-    
+  if (frameCount % 10 === 0) {
+    const fps = Math.round(1000 / (now - lastFrameTime));
     ensureStatusTimer();
-    
-    const fpsEl = document.getElementById('fpsValue');
-    if (fpsEl) {
-      fpsEl.textContent = fps;
-      fpsEl.className = 'value' + (fps < 10 ? ' danger' : fps < 25 ? ' warning' : '');
-    }
-    
-    if (timeEl) timeEl.textContent = formatTime(now - startTime);
-    
-    const loadEl = document.getElementById('loadValue');
-    if (loadEl) {
-      loadEl.innerHTML = load + '<span class="unit">%</span>';
-      loadEl.className = 'value' + (load > 80 ? ' danger' : load > 50 ? ' warning' : '');
-    }
-    
-    const loadBar = document.getElementById('loadBar');
-    if (loadBar) loadBar.style.width = load + '%';
-    
-    const loadBarContainer = document.getElementById('loadBarContainer');
-    if (loadBarContainer) loadBarContainer.classList.add('active');
-
-    if (statusEl) {
-      if (fps < 10) {
-        statusEl.textContent = `☠️ DYING - ${fps} FPS`;
-        statusEl.style.color = '#ef4444';
-        const badge = document.getElementById('statusBadge');
-        if (badge) badge.className = 'status-badge active';
-      } else if (fps < 20) {
-        statusEl.textContent = `🔥 KILLING - ${fps} FPS`;
-        statusEl.style.color = '#f59e0b';
-        const badge = document.getElementById('statusBadge');
-        if (badge) badge.className = 'status-badge crashed';
-      } else {
-        statusEl.textContent = `⚡ DESTROYING - ${fps} FPS`;
-        statusEl.style.color = '#8b9bb5';
-        const badge = document.getElementById('statusBadge');
-        if (badge) badge.className = 'status-badge active';
-      }
-    }
-
-    frameCount = 0;
+    if (statusEl) statusEl.textContent = `Nuking... ~${fps} FPS (pray)`;
     lastFrameTime = now;
   }
+
+  ensureStatusTimer();
+  if (timeEl) timeEl.textContent = formatTime(now - startTime);
 
   animFrameId = requestAnimationFrame(render);
 }
@@ -282,43 +212,22 @@ function startNuke() {
   if (isRunning) {
     setIdle();
     ensureStatusTimer();
-    if (statusEl) statusEl.textContent = 'Stopped - You survived';
-    if (timeEl) timeEl.textContent = '00:00.000';
+    if (statusEl) statusEl.textContent = "Stopped – you survived... this time";
+    if (timeEl) timeEl.textContent = '--:--.---';
     if (stopBtn) stopBtn.style.display = 'none';
     return;
   }
 
   isRunning = true;
   if (crashBtn) {
-    crashBtn.className = 'crash-btn running';
-    document.querySelector('.crash-btn .icon').textContent = '☠️';
-    document.getElementById('btnLabel').textContent = 'KILLING...';
+    crashBtn.disabled = false;
+    crashBtn.textContent = "Stop Crashing";
   }
-  if (stopBtn) stopBtn.style.display = 'flex';
+  if (stopBtn) stopBtn.style.display = 'inline-block';
 
   ensureStatusTimer();
-  if (statusEl) {
-    statusEl.textContent = '☠️ GPU MURDER INITIATED';
-    statusEl.style.color = '#f59e0b';
-    const badge = document.getElementById('statusBadge');
-    if (badge) badge.className = 'status-badge crashed';
-  }
-  if (timeEl) timeEl.textContent = '00:00.000';
-  
-  const fpsEl = document.getElementById('fpsValue');
-  if (fpsEl) {
-    fpsEl.textContent = '0';
-    fpsEl.className = 'value';
-  }
-  const loadEl = document.getElementById('loadValue');
-  if (loadEl) {
-    loadEl.innerHTML = '0<span class="unit">%</span>';
-    loadEl.className = 'value';
-  }
-  const loadBar = document.getElementById('loadBar');
-  if (loadBar) loadBar.style.width = '0%';
-  const loadBarContainer = document.getElementById('loadBarContainer');
-  if (loadBarContainer) loadBarContainer.classList.add('active');
+  if (statusEl) statusEl.textContent = "Nuking GPU – hold on tight";
+  if (timeEl) timeEl.textContent = formatTime(0);
 
   if (!createWebGLContext()) {
     setIdle();
@@ -332,14 +241,17 @@ function startNuke() {
 }
 
 // ──────────────────────────────────────────────
+// Wait for DOM
 document.addEventListener('DOMContentLoaded', () => {
   crashBtn = document.getElementById('crashBtn');
-  stopBtn = document.getElementById('stopBtn');
-  statusEl = document.getElementById('statusText');
-  timeEl = document.getElementById('timeValue');
+  stopBtn  = document.getElementById('stopBtn');
+  statusEl = document.getElementById('status');
+  timeEl   = document.getElementById('time');
 
   if (!crashBtn) {
     console.error("No #crashBtn element found");
+    ensureStatusTimer();
+    if (statusEl) statusEl.textContent = "Missing crash button – add it to HTML";
     return;
   }
 
@@ -349,51 +261,14 @@ document.addEventListener('DOMContentLoaded', () => {
     stopBtn.onclick = () => {
       setIdle();
       ensureStatusTimer();
-      if (statusEl) statusEl.textContent = 'Stopped - You survived';
-      if (timeEl) timeEl.textContent = '00:00.000';
+      if (statusEl) statusEl.textContent = "Stopped – you survived... this time";
+      if (timeEl) timeEl.textContent = '--:--.---';
       if (stopBtn) stopBtn.style.display = 'none';
-      if (crashBtn) {
-        crashBtn.className = 'crash-btn';
-        document.querySelector('.crash-btn .icon').textContent = '⚡';
-        document.getElementById('btnLabel').textContent = 'Crash GPU';
-      }
+      if (crashBtn) crashBtn.textContent = "CRASH GPU NOW";
     };
   }
 
-  // ─── KEYBOARD SHORTCUTS ──────────────────────────────
-  document.addEventListener('keydown', (e) => {
-    if (e.key === ' ' || e.key === 'Enter') {
-      e.preventDefault();
-      startNuke();
-    }
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      if (isRunning) {
-        setIdle();
-        ensureStatusTimer();
-        if (statusEl) statusEl.textContent = 'Stopped - You survived';
-        if (timeEl) timeEl.textContent = '00:00.000';
-        if (stopBtn) stopBtn.style.display = 'none';
-        if (crashBtn) {
-          crashBtn.className = 'crash-btn';
-          document.querySelector('.crash-btn .icon').textContent = '⚡';
-          document.getElementById('btnLabel').textContent = 'Crash GPU';
-        }
-      }
-    }
-  });
-
-  // ─── RESIZE ──────────────────────────────────────────────
-  window.addEventListener('resize', () => {
-    if (canvas) {
-      const scale = CRANK.resolutionScale;
-      canvas.width = window.innerWidth * scale;
-      canvas.height = window.innerHeight * scale;
-      if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
-    }
-  });
-
-  // ─── DUMMY WORKER ──────────────────────────────────────
+  // Dummy worker
   try {
     if (worker) worker.terminate();
     worker = new Worker(URL.createObjectURL(new Blob([`
@@ -402,6 +277,16 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     `], {type: 'text/javascript'})));
   } catch (e) {}
+
+  // Resize handling
+  window.addEventListener('resize', () => {
+    if (canvas) {
+      const scale = 4.0;
+      canvas.width = window.innerWidth * scale;
+      canvas.height = window.innerHeight * scale;
+      if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+  });
 
   setIdle();
 });
