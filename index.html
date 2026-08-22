@@ -24,6 +24,20 @@
     <div class="creator">Created by <a class="creator-link" href="https://github.com/BombedByXander" target="_blank" rel="noreferrer">@prodbyxander</a></div>
     <div class="subtext">Made intentionally for Virtual Machines, Use at own risk.<a class="subtext"></a>
   </div>
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var canvas = document.createElement('canvas');
+    var gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    var statusEl = document.getElementById('statusText');
+    if (gl) {
+      statusEl.textContent = '✅ WebGL: ' + gl.getParameter(gl.VERSION);
+      statusEl.style.color = '#22c55e';
+    } else {
+      statusEl.textContent = '❌ No WebGL!';
+      statusEl.style.color = '#ef4444';
+    }
+  });
+</script>
 
   <script src="crasher.js"></script>
 </body>
