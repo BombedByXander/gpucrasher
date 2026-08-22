@@ -2,29 +2,831 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CrashMyPC | @prodbyxander</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>GPU MURDERER | @prodbyxander</title>
   <script src="https://unpkg.com/gpu.js@latest/dist/gpu-browser.min.js"></script>
   <link rel="preconnect" href="https://fonts.gstatic.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial;color:#e6eef8}
-    body{background:#05060a;display:flex;align-items:center;justify-content:center}
-    .wrap{display:flex;flex-direction:column;align-items:center;gap:22px}
-    #crashBtn{background:linear-gradient(180deg,#7c3aed,#5b21b6);border:0;color:white;padding:20px 36px;border-radius:14px;font-size:20px;font-weight:800;cursor:pointer;box-shadow:0 8px 30px rgba(91,33,182,0.25)}
-    #crashBtn:active{transform:translateY(1px)}
-    .creator{color:#9aa6bf;font-size:13px;opacity:0.9}
-    .subtext{color:#9aa6bf;font-size:13px;opacity:0.9}
-    a.creator-link{color:#9aa6bf;text-decoration:none;border-bottom:1px solid rgba(154,166,191,0.06);padding-bottom:2px}
+    /* ─── RESET ─────────────────────────────────────────── */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #06080b;
+      color: #e8edf5;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ─── ANIMATED BACKGROUND ──────────────────────────── */
+    #bgCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+
+    /* ─── OVERLAY GLOW ──────────────────────────────────── */
+    .glow-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background: radial-gradient(ellipse at 50% 50%, rgba(124, 58, 237, 0.08) 0%, transparent 70%);
+    }
+
+    /* ─── MAIN CONTAINER ────────────────────────────────── */
+    .container {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 30px 20px;
+      gap: 32px;
+    }
+
+    /* ─── STATUS BADGE ──────────────────────────────────── */
+    .status-badge {
+      background: rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 100px;
+      padding: 8px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      color: #8b9bb5;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      display: inline-block;
+      transition: all 0.4s ease;
+    }
+    .status-badge.active .dot {
+      background: #ef4444;
+      animation: pulse-dot 0.8s ease-in-out infinite;
+    }
+    .status-badge.crashed .dot {
+      background: #f59e0b;
+      animation: pulse-dot 0.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.6); opacity: 0.4; }
+    }
+
+    /* ─── MAIN BUTTON ───────────────────────────────────── */
+    .crash-btn {
+      position: relative;
+      background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 40%, #5b21b6 100%);
+      border: none;
+      color: white;
+      padding: 22px 52px;
+      border-radius: 18px;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 
+        0 4px 20px rgba(124, 58, 237, 0.3),
+        0 0 60px rgba(124, 58, 237, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      font-family: 'Inter', sans-serif;
+      min-width: 240px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+    }
+    .crash-btn::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.5), rgba(236, 72, 153, 0.3));
+      z-index: -1;
+      filter: blur(8px);
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    .crash-btn:hover:not(:disabled)::before {
+      opacity: 1;
+    }
+    .crash-btn:hover:not(:disabled) {
+      transform: translateY(-3px) scale(1.02);
+      box-shadow: 
+        0 8px 40px rgba(124, 58, 237, 0.4),
+        0 0 80px rgba(124, 58, 237, 0.15);
+    }
+    .crash-btn:active:not(:disabled) {
+      transform: translateY(0) scale(0.97);
+    }
+    .crash-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .crash-btn .icon {
+      font-size: 26px;
+      line-height: 1;
+    }
+    .crash-btn .label {
+      position: relative;
+    }
+    .crash-btn .label .shine {
+      position: absolute;
+      top: -20%;
+      left: -10%;
+      width: 120%;
+      height: 140%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+      transform: translateX(-100%) rotate(25deg);
+      animation: none;
+    }
+    .crash-btn.running .label .shine {
+      animation: shine-sweep 2s ease-in-out infinite;
+    }
+    @keyframes shine-sweep {
+      0% { transform: translateX(-100%) rotate(25deg); }
+      100% { transform: translateX(200%) rotate(25deg); }
+    }
+
+    /* ─── STOP BUTTON ───────────────────────────────────── */
+    .stop-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #f87171;
+      padding: 14px 36px;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: 'Inter', sans-serif;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      backdrop-filter: blur(10px);
+    }
+    .stop-btn:hover {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: rgba(239, 68, 68, 0.3);
+      transform: scale(1.03);
+    }
+
+    /* ─── METRICS PANEL ─────────────────────────────────── */
+    .metrics {
+      display: flex;
+      gap: 30px;
+      padding: 16px 32px;
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      margin-top: 8px;
+      min-width: 320px;
+      justify-content: center;
+    }
+    .metric-item {
+      text-align: center;
+    }
+    .metric-item .value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #e8edf5;
+      font-variant-numeric: tabular-nums;
+      transition: color 0.3s ease;
+    }
+    .metric-item .value.danger { color: #ef4444; }
+    .metric-item .value.warning { color: #f59e0b; }
+    .metric-item .label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #6b7d98;
+      margin-top: 4px;
+    }
+
+    /* ─── FOOTER ────────────────────────────────────────── */
+    .footer {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .footer .creator {
+      color: #6b7d98;
+      font-size: 14px;
+      font-weight: 400;
+      letter-spacing: 0.2px;
+    }
+    .footer .creator a {
+      color: #8b9bb5;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.3s ease;
+      border-bottom: 1px solid rgba(139, 155, 181, 0.15);
+      padding-bottom: 2px;
+    }
+    .footer .creator a:hover {
+      color: #a78bfa;
+      border-bottom-color: rgba(167, 139, 250, 0.3);
+    }
+    .footer .subtext {
+      color: #4a5a72;
+      font-size: 12px;
+      font-weight: 400;
+      letter-spacing: 0.3px;
+      opacity: 0.7;
+      text-align: center;
+      max-width: 380px;
+      line-height: 1.5;
+    }
+
+    /* ─── KEYBOARD HINT ──────────────────────────────────── */
+    .keyboard-hint {
+      font-size: 11px;
+      color: #3a4a62;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: -12px;
+    }
+    .keyboard-hint kbd {
+      background: rgba(255, 255, 255, 0.06);
+      padding: 2px 10px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #6b7d98;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* ─── RESPONSIVE ────────────────────────────────────── */
+    @media (max-width: 640px) {
+      .crash-btn {
+        padding: 18px 32px;
+        font-size: 18px;
+        min-width: 180px;
+        border-radius: 14px;
+      }
+      .crash-btn .icon { font-size: 20px; }
+      .metrics {
+        gap: 20px;
+        padding: 14px 20px;
+        min-width: unset;
+        width: 100%;
+        max-width: 340px;
+        flex-wrap: wrap;
+      }
+      .metric-item .value { font-size: 18px; }
+      .status-badge { font-size: 11px; padding: 6px 16px; }
+      .footer .subtext { font-size: 11px; max-width: 280px; }
+    }
+
+    @media (max-width: 400px) {
+      .crash-btn {
+        padding: 16px 24px;
+        font-size: 16px;
+        min-width: 150px;
+      }
+      .metrics { gap: 12px; padding: 12px 16px; }
+      .metric-item .value { font-size: 15px; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <button id="crashBtn">Crash GPU</button>
-    <div class="creator">Created by <a class="creator-link" href="https://github.com/BombedByXander" target="_blank" rel="noreferrer">@prodbyxander</a></div>
-    <div class="subtext">Made intentionally for Virtual Machines, Use at own risk.<a class="subtext"></a>
+
+  <!-- ─── BACKGROUND ANIMATION ─────────────────────────── -->
+  <canvas id="bgCanvas"></canvas>
+  <div class="glow-overlay"></div>
+
+  <!-- ─── MAIN CONTENT ──────────────────────────────────── -->
+  <div class="container">
+
+    <!-- Status Badge -->
+    <div class="status-badge" id="statusBadge">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Ready</span>
+    </div>
+
+    <!-- Main Button -->
+    <button class="crash-btn" id="crashBtn">
+      <span class="icon">⚡</span>
+      <span class="label">
+        <span class="shine"></span>
+        <span id="btnLabel">Crash GPU</span>
+      </span>
+    </button>
+
+    <!-- Stop Button -->
+    <button class="stop-btn" id="stopBtn">
+      <span>⏹</span> Stop
+    </button>
+
+    <!-- Metrics -->
+    <div class="metrics" id="metricsPanel">
+      <div class="metric-item">
+        <div class="value" id="fpsValue">--</div>
+        <div class="label">FPS</div>
+      </div>
+      <div class="metric-item">
+        <div class="value" id="timeValue">00:00.000</div>
+        <div class="label">Elapsed</div>
+      </div>
+      <div class="metric-item">
+        <div class="value" id="loadValue">0%</div>
+        <div class="label">GPU Load</div>
+      </div>
+    </div>
+
+    <!-- Keyboard Hint -->
+    <div class="keyboard-hint">
+      <kbd>Space</kbd> or <kbd>Enter</kbd> to start · <kbd>Esc</kbd> to stop
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="creator">
+        Created by <a href="https://github.com/BombedByXander" target="_blank" rel="noreferrer">@prodbyxander</a>
+      </div>
+      <div class="subtext">
+        Made intentionally for Virtual Machines · Use at your own risk
+      </div>
+    </div>
+
   </div>
 
-  <script src="crasher.js"></script>
-</body>
-</html>
+  <!-- ─── SCRIPT ────────────────────────────────────────── -->
+  <script>
+    // ─── BACKGROUND ANIMATION ──────────────────────────────
+    (function initBackground() {
+      const canvas = document.getElementById('bgCanvas');
+      const ctx = canvas.getContext('2d');
+      let w, h;
+      const particles = [];
+      const count = 60;
+
+      function resize() {
+        w = canvas.width = window.innerWidth;
+        h = canvas.height = window.innerHeight;
+      }
+      window.addEventListener('resize', resize);
+      resize();
+
+      class Particle {
+        constructor() { this.reset(); }
+        reset() {
+          this.x = Math.random() * w;
+          this.y = Math.random() * h;
+          this.size = Math.random() * 2 + 0.5;
+          this.speedX = (Math.random() - 0.5) * 0.3;
+          this.speedY = (Math.random() - 0.5) * 0.3;
+          this.opacity = Math.random() * 0.4 + 0.1;
+        }
+        update() {
+          this.x += this.speedX;
+          this.y += this.speedY;
+          if (this.x < 0 || this.x > w || this.y < 0 || this.y > h) this.reset();
+        }
+        draw() {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(124, 58, 237, ${this.opacity})`;
+          ctx.fill();
+        }
+      }
+
+      for (let i = 0; i < count; i++) particles.push(new Particle());
+
+      function animate() {
+        ctx.clearRect(0, 0, w, h);
+        particles.forEach(p => { p.update(); p.draw(); });
+        // Draw connections
+        for (let i = 0; i < particles.length; i++) {
+          for (let j = i + 1; j < particles.length; j++) {
+            const dx = particles[i].x - particles[j].x;
+            const dy = particles[i].y - particles[j].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 180) {
+              ctx.beginPath();
+              ctx.moveTo(particles[i].x, particles[i].y);
+              ctx.lineTo(particles[j].x, particles[j].y);
+              ctx.strokeStyle = `rgba(124, 58, 237, ${0.06 * (1 - dist / 180)})`;
+              ctx.lineWidth = 0.6;
+              ctx.stroke();
+            }
+          }
+        }
+        requestAnimationFrame(animate);
+      }
+      animate();
+    })();
+
+    // ─── MAIN APP ──────────────────────────────────────────
+    // This is your EXISTING crasher.js logic, but with UI integration
+    // I'll keep it self-contained here for the demo
+
+    let worker = null;
+    let isRunning = false;
+
+    let crashBtn = document.getElementById('crashBtn');
+    let stopBtn = document.getElementById('stopBtn');
+    let statusText = document.getElementById('statusText');
+    let statusDot = document.getElementById('statusDot');
+    let statusBadge = document.getElementById('statusBadge');
+    let btnLabel = document.getElementById('btnLabel');
+    let fpsValue = document.getElementById('fpsValue');
+    let timeValue = document.getElementById('timeValue');
+    let loadValue = document.getElementById('loadValue');
+
+    let gl = null;
+    let program = null;
+    let canvas = null;
+    let startTime = 0;
+    let animFrameId = null;
+    let frameCount = 0;
+    let lastFrameTime = 0;
+    let lastFpsUpdate = 0;
+    let currentFps = 0;
+
+    // ─── TORTURE CONFIG ──────────────────────────────────
+    const TORTURE = {
+      shaderLoops: 250,
+      raymarchSteps: 600,
+      renderPasses: 6,
+      memoryChunks: 300,
+      workerSpam: true,
+      extraGeometry: true,
+      textureBomb: true
+    };
+
+    let memoryBomb = [];
+    let textureBombs = [];
+    let extraBuffers = [];
+    let tortureWorkers = [];
+
+    // ─── UI HELPERS ──────────────────────────────────────
+    function setStatus(text, type = 'idle') {
+      statusText.textContent = text;
+      statusBadge.className = 'status-badge';
+      if (type === 'running') {
+        statusBadge.classList.add('active');
+        statusDot.style.background = '#ef4444';
+      } else if (type === 'crashed') {
+        statusBadge.classList.add('crashed');
+        statusDot.style.background = '#f59e0b';
+      } else {
+        statusDot.style.background = '#22c55e';
+      }
+    }
+
+    function setMetrics(fps, elapsed, load) {
+      if (fps !== undefined) {
+        currentFps = fps;
+        fpsValue.textContent = fps > 0 ? fps : '--';
+        fpsValue.className = 'value' + (fps < 10 ? ' danger' : fps < 25 ? ' warning' : '');
+      }
+      if (elapsed !== undefined) {
+        const total = Math.max(0, Math.floor(elapsed));
+        const minutes = String(Math.floor(total / 60000)).padStart(2, '0');
+        const seconds = String(Math.floor((total % 60000) / 1000)).padStart(2, '0');
+        const millis = String(total % 1000).padStart(3, '0');
+        timeValue.textContent = `${minutes}:${seconds}.${millis}`;
+      }
+      if (load !== undefined) {
+        const l = Math.min(100, Math.round(load));
+        loadValue.textContent = l + '%';
+        loadValue.className = 'value' + (l > 80 ? ' danger' : l > 50 ? ' warning' : '');
+      }
+    }
+
+    function setIdle() {
+      isRunning = false;
+      if (crashBtn) {
+        crashBtn.disabled = false;
+        crashBtn.className = 'crash-btn';
+        btnLabel.textContent = 'Crash GPU';
+        document.querySelector('.crash-btn .icon').textContent = '⚡';
+      }
+      if (stopBtn) stopBtn.style.display = 'none';
+      if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+
+      memoryBomb = [];
+      textureBombs = [];
+      extraBuffers = [];
+      tortureWorkers.forEach(w => { try { w.terminate(); } catch(e) {} });
+      tortureWorkers = [];
+
+      if (gl) {
+        try {
+          for (let i = 0; i < 50; i++) {
+            const trash = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, trash);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(1000000), gl.STATIC_DRAW);
+            gl.deleteBuffer(trash);
+          }
+        } catch(e) {}
+      }
+
+      setStatus('Ready', 'idle');
+      setMetrics(0, 0, 0);
+    }
+
+    // ─── WEBGL CONTEXT ──────────────────────────────────
+    function createWebGLContext() {
+      if (canvas) return true;
+      canvas = document.createElement('canvas');
+      canvas.style.position = 'fixed';
+      canvas.style.inset = '0';
+      canvas.style.zIndex = '-1';
+      canvas.style.pointerEvents = 'none';
+      canvas.style.opacity = '0.7';
+      document.body.prepend(canvas);
+
+      const scale = 6.0;
+      canvas.width = window.innerWidth * scale;
+      canvas.height = window.innerHeight * scale;
+
+      gl = canvas.getContext('webgl2', {
+        antialias: false,
+        powerPreference: 'high-performance',
+        desynchronized: true,
+        preserveDrawingBuffer: false,
+        failIfMajorPerformanceCaveat: false
+      }) || canvas.getContext('webgl');
+
+      if (!gl) {
+        setStatus('No WebGL!', 'idle');
+        return false;
+      }
+
+      // ─── Shaders ──────────────────────────────────────
+      const vsSource = `#version 300 es
+        in vec2 a_position;
+        in vec3 a_color;
+        out vec3 v_color;
+        uniform float u_time;
+        void main() {
+          vec2 pos = a_position;
+          float wave = sin(pos.x * 30.0 + u_time * 5.0) * 0.1;
+          wave += cos(pos.y * 25.0 + u_time * 4.0) * 0.1;
+          wave += sin((pos.x + pos.y) * 40.0 + u_time * 7.0) * 0.05;
+          pos += wave;
+          gl_Position = vec4(pos, 0.0, 1.0);
+          v_color = a_color + vec3(sin(u_time + pos.x * 50.0), cos(u_time + pos.y * 50.0), 0.0) * 0.3;
+        }`;
+
+      const fsSource = `#version 300 es
+        precision highp float;
+        precision highp int;
+        out vec4 fragColor;
+        uniform vec2 u_resolution;
+        uniform float u_time;
+        uniform int u_pass;
+
+        float hash(vec3 p) {
+          p = fract(p * 0.3183099 + 0.1);
+          p *= 17.0;
+          return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+        }
+        
+        float noise3D(vec3 p) {
+          vec3 i = floor(p);
+          vec3 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(
+            mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),
+                mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+            mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z
+          );
+        }
+        
+        float fbm(vec3 p) {
+          float v = 0.0;
+          float a = 0.5;
+          for (int i = 0; i < 25; i++) {
+            v += a * noise3D(p);
+            p *= 2.7;
+            a *= 0.38;
+          }
+          return v;
+        }
+
+        float trigHell(vec3 p, float t) {
+          float v = 0.0;
+          float amp = 1.0;
+          for (int i = 0; i < 250; i++) {
+            float fi = float(i);
+            v += amp * sin(p.x * 13.7 + t * 2.4 + fi * 0.1);
+            v += amp * cos(p.y * 16.9 + t * 2.8 + fi * 0.13);
+            v += amp * tan(atan(p.z * 10.3 + t * 1.6 + fi * 0.07) * 1.4);
+            v += amp * sin(cos(tan(v * 4.1 + fi * 0.05)) * 5.3);
+            v += amp * cos(sin(v * 3.7 + fi * 0.03) * 4.9);
+            v += amp * atan(sin(v * 6.3 + t * 2.1) * 1.7);
+            v = fract(v * 1.6180339887);
+            amp *= 0.37;
+            p += vec3(sin(t * 0.9 + fi * 0.02), cos(t * 1.3 + fi * 0.025), tan(t * 0.7 + fi * 0.015));
+            p = abs(p) - 0.5;
+            p = vec3(sin(p.x + t), cos(p.y + t), tan(p.z + t));
+          }
+          return v;
+        }
+
+        float raymarch(vec3 ro, vec3 rd, float t) {
+          float dist = 0.0;
+          float accum = 0.0;
+          for (int i = 0; i < 600; i++) {
+            vec3 p = ro + rd * dist;
+            float density = abs(trigHell(p * 3.8 + t * 1.6, t)) * 0.12;
+            density += abs(sin(p.x * 50.0 + t * 20.0) * cos(p.y * 50.0 + t * 15.0)) * 0.02;
+            density += abs(cos(p.z * 45.0 + t * 18.0) * sin(p.x * 55.0 + t * 22.0)) * 0.02;
+            accum += density * exp(-dist * 0.018);
+            accum += sin(dist * 22.0 + t * 7.0) * cos(dist * 15.0) * 0.035;
+            accum += cos(dist * 33.0 + t * 9.0) * sin(dist * 27.0) * 0.025;
+            dist += max(0.02, density * 0.38);
+            if (dist > 100.0 || accum > 15.0) break;
+          }
+          return accum;
+        }
+
+        void main() {
+          vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
+          float t = u_time * 0.5 + float(u_pass) * 0.15;
+          
+          vec3 ro = vec3(
+            sin(t * 0.8) * 8.0 * cos(t * 0.3),
+            cos(t * 0.6) * 5.0 + sin(t * 0.4) * 2.0,
+            -12.0 + sin(t * 0.7) * 4.0
+          );
+          vec3 rd = normalize(vec3(
+            uv * 2.2 + sin(t * 0.5 + uv.y * 3.0) * 0.3,
+            1.9 + sin(t * 0.5) * 0.8 + cos(uv.x * 5.0 + t) * 0.2
+          ));
+
+          float total = 0.0;
+          for (int s = 0; s < 4; s++) {
+            float fi = float(s);
+            vec2 offset = vec2(sin(fi * 1.7 + t * 2.0), cos(fi * 1.3 + t * 1.5)) * 0.003;
+            vec3 rd2 = normalize(rd + vec3(offset, 0.0));
+            total += raymarch(ro, rd2, t + fi * 0.02);
+          }
+          total /= 4.0;
+
+          vec3 col = 0.5 + 0.5 * vec3(
+            sin(total * 5.1 + t * 2.4 + total * 2.0),
+            cos(total * 6.8 + t * 2.1 + total * 1.5),
+            sin(total * 4.7 + t * 1.2 + total * 3.0)
+          );
+          
+          col += vec3(
+            sin(total * 50.0 + t * 30.0) * 0.05,
+            cos(total * 45.0 + t * 25.0) * 0.05,
+            sin(total * 55.0 + t * 35.0) * 0.05
+          );
+          
+          float scanline = sin(uv.y * 1200.0 + t * 200.0) * 0.03;
+          col += scanline;
+          float bloom = exp(-total * 0.5) * 0.1;
+          col += bloom;
+          col = pow(col, vec3(0.8 + 0.3 * sin(t * 0.1)));
+          col = col / (col + 0.8);
+          
+          fragColor = vec4(col, 1.0);
+        }`;
+
+      const vs = gl.createShader(gl.VERTEX_SHADER);
+      gl.shaderSource(vs, vsSource);
+      gl.compileShader(vs);
+
+      const fs = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(fs, fsSource);
+      gl.compileShader(fs);
+
+      if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS) || !gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(vs) || gl.getShaderInfoLog(fs));
+        setStatus('Shader failed!', 'idle');
+        return false;
+      }
+
+      program = gl.createProgram();
+      gl.attachShader(program, vs);
+      gl.attachShader(program, fs);
+      gl.linkProgram(program);
+
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+        setStatus('Link failed!', 'idle');
+        return false;
+      }
+
+      gl.useProgram(program);
+
+      // ─── Geometry ─────────────────────────────────────
+      const gridSize = 80;
+      const vertices = [];
+      const colors = [];
+      for (let y = 0; y <= gridSize; y++) {
+        for (let x = 0; x <= gridSize; x++) {
+          const u = (x / gridSize) * 2 - 1;
+          const v = (y / gridSize) * 2 - 1;
+          vertices.push(u, v);
+          colors.push(Math.random(), Math.random(), Math.random());
+        }
+      }
+      
+      const indexData = [];
+      for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+          const i = y * (gridSize + 1) + x;
+          indexData.push(i, i + 1, i + gridSize + 1);
+          indexData.push(i + 1, i + gridSize + 2, i + gridSize + 1);
+        }
+      }
+
+      const posBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+      const posLoc = gl.getAttribLocation(program, 'a_position');
+      gl.enableVertexAttribArray(posLoc);
+      gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+      const colorBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+      const colorLoc = gl.getAttribLocation(program, 'a_color');
+      if (colorLoc !== -1) {
+        gl.enableVertexAttribArray(colorLoc);
+        gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, 0, 0);
+      }
+
+      const indexBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexData), gl.STATIC_DRAW);
+
+      // ─── Texture Bomb ─────────────────────────────────
+      try {
+        for (let i = 0; i < 30; i++) {
+          const size = 2048;
+          const data = new Uint8Array(size * size * 4);
+          for (let j = 0; j < data.length; j += 4) {
+            data[j] = Math.random() * 255;
+            data[j+1] = Math.random() * 255;
+            data[j+2] = Math.random() * 255;
+            data[j+3] = 255;
+          }
+          const tex = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, tex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          textureBombs.push(tex);
+        }
+      } catch(e) {}
+
+      // ─── Memory Bomb ──────────────────────────────────
+      try {
+        for (let i = 0; i < TORTURE.memoryChunks; i++) {
+          const size = 1024 * 1024;
+          const chunk = new Uint8Array(size);
+          for (let j = 0; j < size; j += 4096) {
+            chunk[j] = Math.random() * 255;
+            chunk[j+1] = Math.random() * 255;
+            chunk[j+2] = Math.random() * 255;
+          }
+          memoryBomb.push(chunk);
+        }
+      }
