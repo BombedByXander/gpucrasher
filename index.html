@@ -829,4 +829,125 @@
             worker.postMessage('start');
             tortureWorkers.push(worker);
           }
+        } catch(e) {}
+      }
+
+      return true;
+    }
+
+    function render(now) {
+      if (!isRunning || !gl || !program) return;
+
+      const elapsed = (now - startTime) / 1000;
+      const heat = Math.min(100, (elapsed / 10) * 40 + 20 + Math.random() * 10);
+
+      for (let pass = 0; pass < TORTURE.renderPasses; pass++) {
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        const resLoc = gl.getUniformLocation(program, 'u_resolution');
+        const timeLoc = gl.getUniformLocation(program, 'u_time');
+        const passLoc = gl.getUniformLocation(program, 'u_pass');
+        
+        if (resLoc) gl.uniform2f(resLoc, canvas.width, canvas.height);
+        if (timeLoc) gl.uniform1f(timeLoc, elapsed + pass * 0.1);
+        if (passLoc) gl.uniform1i(passLoc, pass);
+        
+        const indexCount = 80 * 80 * 6;
+        gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
+      }
+
+      frameCount++;
+
+      if (now - lastFpsUpdate > 200) {
+        const fps = Math.round(frameCount / ((now - lastFpsUpdate) / 1000));
+        setMetrics(fps, now - startTime, heat);
+        
+        if (fps < 10) {
+          setStatus(`☠️ MURDERING GPU - ${fps} FPS`, 'running');
+        } else if (fps < 25) {
+          setStatus(`🔥 KILLING GPU - ${fps} FPS`, 'running');
+        } else {
+          setStatus(`⚡ DESTROYING GPU - ${fps} FPS`, 'running');
         }
+        
+        frameCount = 0;
+        lastFpsUpdate = now;
+      }
+
+      animFrameId = requestAnimationFrame(render);
+    }
+
+    function startNuke() {
+      if (isRunning) {
+        setIdle();
+        setStatus('Stopped - You survived... this time', 'idle');
+        return;
+      }
+
+      isRunning = true;
+      if (crashBtn) {
+        crashBtn.className = 'crash-btn running';
+        btnLabel.textContent = 'KILLING...';
+        document.querySelector('.crash-btn .icon').textContent = '☠️';
+      }
+      if (stopBtn) stopBtn.style.display = 'flex';
+      
+      setStatus('☠️ GPU MURDER INITIATED', 'crashed');
+      setMetrics(0, 0, 0);
+
+      if (!createWebGLContext()) {
+        setIdle();
+        return;
+      }
+
+      startTime = performance.now();
+      frameCount = 0;
+      lastFpsUpdate = startTime;
+      requestAnimationFrame(render);
+    }
+
+    function stopNuke() {
+      setIdle();
+      setStatus('Stopped - You survived... this time', 'idle');
+      if (stopBtn) stopBtn.style.display = 'none';
+      if (crashBtn) {
+        crashBtn.className = 'crash-btn';
+        btnLabel.textContent = 'Crash GPU';
+        document.querySelector('.crash-btn .icon').textContent = '⚡';
+      }
+    }
+
+    // ─── EVENT LISTENERS ──────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+      if (crashBtn) {
+        crashBtn.addEventListener('click', startNuke);
+      }
+      
+      if (stopBtn) {
+        stopBtn.addEventListener('click', stopNuke);
+      }
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          startNuke();
+        }
+        if (e.key === 'Escape' || e.key === 's' || e.key === 'S') {
+          e.preventDefault();
+          stopNuke();
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        if (canvas && gl) {
+          const scale = 6.0;
+          canvas.width = window.innerWidth * scale;
+          canvas.height = window.innerHeight * scale;
+          gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+      });
+
+      setIdle();
+    });
+  </script>
+</body>
+</html>
