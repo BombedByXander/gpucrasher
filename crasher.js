@@ -32,7 +32,6 @@ function isLowEndDevice() {
 const isLowEnd = isLowEndDevice();
 
 // ─── DYNAMIC CONFIG ──────────────────────────────────────
-// These values ESCALATE as the phone tries to defend itself
 let CONFIG = {
   shaderLoops: isLowEnd ? 80 : 150,
   raymarchSteps: isLowEnd ? 300 : 500,
@@ -59,17 +58,14 @@ function formatTime(ms) {
 }
 
 function escalateTorture() {
-  // If the phone is "defending" itself, we escalate!
   CONFIG.escalationLevel++;
   
-  // CRANK EVERYTHING UP
   CONFIG.shaderLoops = Math.min(200, CONFIG.shaderLoops + 15);
   CONFIG.raymarchSteps = Math.min(700, CONFIG.raymarchSteps + 30);
   CONFIG.renderPasses = Math.min(40, CONFIG.renderPasses + 3);
   CONFIG.resolutionScale = Math.min(8.0, CONFIG.resolutionScale + 0.3);
   CONFIG.memoryChunks = Math.min(600, CONFIG.memoryChunks + 30);
   
-  // Add more memory chunks
   try {
     for (let i = 0; i < 20; i++) {
       const size = 1024 * 1024;
@@ -81,7 +77,6 @@ function escalateTorture() {
     }
   } catch(e) {}
   
-  // Force recompile shader with new values
   if (gl && program) {
     try {
       gl.deleteProgram(program);
@@ -89,7 +84,6 @@ function escalateTorture() {
     } catch(e) {}
   }
   
-  // Destroy and recreate context
   if (canvas) {
     try {
       canvas.remove();
@@ -97,20 +91,26 @@ function escalateTorture() {
     } catch(e) {}
   }
   
-  // Force garbage collection
   if (window.gc) {
     try { window.gc(); } catch(e) {}
   }
   
-  // Update status
   if (statusEl) {
     statusEl.textContent = `🔥 ESCALATION ${CONFIG.escalationLevel} - ${CONFIG.renderPasses}x passes`;
     statusEl.style.color = '#ef4444';
   }
   
+  // ─── TRIGGER GLITCH ON ESCALATION ──────────────────────
+  if (window.glitchSystem && window.glitchSystem.isRunning) {
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        window.glitchSystem.randomGlitch();
+      }, i * 100);
+    }
+  }
+  
   console.log(`🔥 ESCALATED to Level ${CONFIG.escalationLevel}: ${CONFIG.renderPasses} passes, ${CONFIG.shaderLoops} loops`);
   
-  // Recreate context
   setTimeout(() => {
     if (isRunning) {
       createWebGLContext();
@@ -133,6 +133,11 @@ function setIdle() {
   if (animFrameId) {
     cancelAnimationFrame(animFrameId);
     animFrameId = null;
+  }
+
+  // ─── STOP GLITCHES ──────────────────────────────────────
+  if (window.glitchSystem) {
+    window.glitchSystem.stop();
   }
 
   memoryBomb = [];
@@ -219,7 +224,6 @@ function createWebGLContext() {
 
   let vsSource, fsSource;
 
-  // ─── DYNAMIC SHADER WITH CURRENT CONFIG VALUES ──────────
   const currentLoops = CONFIG.shaderLoops;
   const currentSteps = CONFIG.raymarchSteps;
 
@@ -378,6 +382,21 @@ function createWebGLContext() {
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
+  if (CONFIG.memoryChunks > 0) {
+    try {
+      for (let i = 0; i < CONFIG.memoryChunks; i++) {
+        const size = 1024 * 1024;
+        const chunk = new Uint8Array(size);
+        for (let j = 0; j < size; j += 4096) {
+          chunk[j] = Math.random() * 255;
+          chunk[j+1] = Math.random() * 255;
+          chunk[j+2] = Math.random() * 255;
+        }
+        memoryBomb.push(chunk);
+      }
+    } catch(e) {}
+  }
+
   return true;
 }
 
@@ -387,7 +406,6 @@ function render(now) {
   const elapsed = (now - startTime) / 1000;
   const heat = Math.min(100, (elapsed / 5) * 50 + 20 + Math.random() * 10);
 
-  // ─── MULTIPLE PASSES ──────────────────────────────────
   for (let pass = 0; pass < CONFIG.renderPasses; pass++) {
     gl.viewport(0, 0, canvas.width, canvas.height);
     const resLoc = gl.getUniformLocation(program, 'u_resolution');
@@ -405,20 +423,17 @@ function render(now) {
     const fps = Math.round(frameCount / ((now - lastFpsUpdate) / 1000));
     const load = Math.min(100, Math.round((1 - fps / 60) * 100 + 20));
     
-    // ─── DETECT THROTTLING & ESCALATE ──────────────────
     if (fps < 10 && lastFps < 10) {
       consecutiveLowFps++;
     } else {
       consecutiveLowFps = 0;
     }
     
-    // If FPS stays low for too long, the phone is "defending" - ESCALATE!
     if (consecutiveLowFps > 5 && CONFIG.escalationLevel < CONFIG.maxEscalation) {
       escalateTorture();
       consecutiveLowFps = 0;
     }
     
-    // Also escalate every 30 seconds if still running
     escalationTimer += 0.2;
     if (escalationTimer > 30 && CONFIG.escalationLevel < CONFIG.maxEscalation) {
       escalateTorture();
@@ -427,7 +442,6 @@ function render(now) {
     
     lastFps = fps;
     
-    // ─── UPDATE METRICS ──────────────────────────────────
     if (fpsEl) {
       fpsEl.textContent = fps;
       fpsEl.className = 'value' + (fps < 10 ? ' danger' : fps < 25 ? ' warning' : '');
@@ -440,7 +454,6 @@ function render(now) {
     if (loadBar) loadBar.style.width = load + '%';
     if (loadBarContainer) loadBarContainer.classList.add('active');
 
-    // ─── UPDATE STATUS ──────────────────────────────────
     if (statusEl) {
       const escText = CONFIG.escalationLevel > 0 ? ` ⚡Lv${CONFIG.escalationLevel}` : '';
       if (fps < 5) {
@@ -523,6 +536,13 @@ function startNuke() {
   if (!createWebGLContext()) {
     setIdle();
     return;
+  }
+
+  // ─── START GLITCHES ──────────────────────────────────────
+  if (window.glitchSystem) {
+    setTimeout(() => {
+      window.glitchSystem.start();
+    }, 1500);
   }
 
   startTime = performance.now();
