@@ -1,9 +1,17 @@
+// ─── MAIN APP ──────────────────────────────────────────
 let worker = null;
 let isRunning = false;
-let crashBtn = null;
-let stopBtn = null;
-let statusEl = null;
-let timeEl = null;
+
+let crashBtn = document.getElementById('crashBtn');
+let stopBtn = document.getElementById('stopBtn');
+let statusText = document.getElementById('statusText');
+let statusDot = document.getElementById('statusDot');
+let statusBadge = document.getElementById('statusBadge');
+let btnLabel = document.getElementById('btnLabel');
+let fpsValue = document.getElementById('fpsValue');
+let timeValue = document.getElementById('timeValue');
+let loadValue = document.getElementById('loadValue');
+
 let gl = null;
 let program = null;
 let canvas = null;
@@ -11,17 +19,20 @@ let startTime = 0;
 let animFrameId = null;
 let frameCount = 0;
 let lastFrameTime = 0;
+let lastFpsUpdate = 0;
+let currentFps = 0;
+let totalFrames = 0;
+let frameTimes = [];
 
-// ─── NEW: TORTURE CONFIG ──────────────────────────────
+// ─── TORTURE CONFIG ──────────────────────────────────
 const TORTURE = {
-  shaderLoops: 250,        // was 110 → now 250
-  raymarchSteps: 600,      // was 420 → now 600
-  renderPasses: 6,         // NEW: multiple passes per frame
-  memoryChunks: 300,       // NEW: memory bomb
-  workerSpam: true,        // NEW: worker torture
-  extraGeometry: true,     // NEW: more vertices
-  textureBomb: true,       // NEW: texture allocation spam
-  computeWarp: true        // NEW: extra compute shader work
+  shaderLoops: 250,
+  raymarchSteps: 600,
+  renderPasses: 6,
+  memoryChunks: 300,
+  workerSpam: true,
+  extraGeometry: true,
+  textureBomb: true
 };
 
 let memoryBomb = [];
@@ -29,61 +40,67 @@ let textureBombs = [];
 let extraBuffers = [];
 let tortureWorkers = [];
 
-// ──────────────────────────────────────────────
-function ensureStatusTimer() {
-  if (!statusEl) {
-    statusEl = document.createElement('div');
-    statusEl.id = 'status';
-    Object.assign(statusEl.style, {
-      position: 'fixed', top: '18px', left: '50%', transform: 'translateX(-50%)',
-      background: 'rgba(0,0,0,0.7)', color: '#ff0044', padding: '10px 16px',
-      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
-      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)',
-      border: '1px solid #ff0044', fontWeight: 'bold'
-    });
-    document.body.appendChild(statusEl);
-  }
-  if (!timeEl) {
-    timeEl = document.createElement('div');
-    timeEl.id = 'time';
-    Object.assign(timeEl.style, {
-      position: 'fixed', top: '65px', left: '50%', transform: 'translateX(-50%)',
-      background: 'rgba(0,0,0,0.65)', color: '#ff8800', padding: '8px 14px',
-      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
-      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)',
-      border: '1px solid #ff8800'
-    });
-    document.body.appendChild(timeEl);
+// ─── UI HELPERS ──────────────────────────────────────
+function setStatus(text, type = 'idle') {
+  statusText.textContent = text;
+  statusBadge.className = 'status-badge';
+  if (type === 'running') {
+    statusBadge.classList.add('active');
+    statusDot.style.background = '#ef4444';
+  } else if (type === 'crashed') {
+    statusBadge.classList.add('crashed');
+    statusDot.style.background = '#f59e0b';
+  } else {
+    statusDot.style.background = '#22c55e';
   }
 }
 
-function formatTime(ms) {
-  if (!isFinite(ms)) return '--:--.---';
-  const total = Math.max(0, Math.floor(ms));
-  const minutes = Math.floor(total / 60000);
-  const seconds = Math.floor((total % 60000) / 1000);
-  const millis = total % 1000;
-  return `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}.${String(millis).padStart(3,'0')}`;
+function setMetrics(fps, elapsed, load) {
+  if (fps !== undefined && fps > 0) {
+    currentFps = fps;
+    fpsValue.textContent = fps;
+    fpsValue.className = 'value' + (fps < 10 ? ' danger' : fps < 25 ? ' warning' : '');
+  } else if (fps === 0) {
+    fpsValue.textContent = '--';
+    fpsValue.className = 'value';
+  }
+  
+  if (elapsed !== undefined) {
+    const total = Math.max(0, Math.floor(elapsed));
+    const minutes = String(Math.floor(total / 60000)).padStart(2, '0');
+    const seconds = String(Math.floor((total % 60000) / 1000)).padStart(2, '0');
+    const millis = String(total % 1000).padStart(3, '0');
+    timeValue.textContent = `${minutes}:${seconds}.${millis}`;
+  }
+  
+  if (load !== undefined) {
+    const l = Math.min(100, Math.round(load));
+    loadValue.textContent = l + '%';
+    loadValue.className = 'value' + (l > 80 ? ' danger' : l > 50 ? ' warning' : '');
+  }
 }
 
 function setIdle() {
   isRunning = false;
   if (crashBtn) {
     crashBtn.disabled = false;
-    crashBtn.textContent = "💀 CRASH GPU NOW";
+    crashBtn.className = 'crash-btn';
+    btnLabel.textContent = 'Crash GPU';
+    document.querySelector('.crash-btn .icon').textContent = '⚡';
   }
+  if (stopBtn) stopBtn.style.display = 'none';
   if (animFrameId) {
     cancelAnimationFrame(animFrameId);
     animFrameId = null;
   }
-  
+
   // Clean up torture resources
   memoryBomb = [];
   textureBombs = [];
   extraBuffers = [];
   tortureWorkers.forEach(w => { try { w.terminate(); } catch(e) {} });
   tortureWorkers = [];
-  
+
   if (gl) {
     try {
       // Force GPU reset by creating and deleting massive resources
@@ -95,27 +112,23 @@ function setIdle() {
       }
     } catch(e) {}
   }
-  
-  ensureStatusTimer();
-  if (statusEl) {
-    statusEl.textContent = "💀 GPU SURVIVED (barely)";
-    statusEl.style.border = '1px solid #00ff88';
-    statusEl.style.color = '#00ff88';
-  }
-  if (timeEl) timeEl.textContent = formatTime(0);
+
+  setStatus('Ready', 'idle');
+  setMetrics(0, 0, 0);
 }
 
+// ─── WEBGL CONTEXT ──────────────────────────────────
 function createWebGLContext() {
   if (canvas) return true;
-
+  
   canvas = document.createElement('canvas');
   canvas.style.position = 'fixed';
   canvas.style.inset = '0';
-  canvas.style.zIndex = '-999';
+  canvas.style.zIndex = '-1';
   canvas.style.pointerEvents = 'none';
-  document.body.appendChild(canvas);
+  canvas.style.opacity = '0.7';
+  document.body.prepend(canvas);
 
-  // ULTRA resolution (was 4.0 → now 6.0)
   const scale = 6.0;
   canvas.width = window.innerWidth * scale;
   canvas.height = window.innerHeight * scale;
@@ -129,19 +142,17 @@ function createWebGLContext() {
   }) || canvas.getContext('webgl');
 
   if (!gl) {
-    ensureStatusTimer();
-    if (statusEl) statusEl.textContent = "NO WEBGL - YOUR GPU IS PUSSY";
+    setStatus('No WebGL!', 'idle');
     return false;
   }
 
-  // ─── VERTEX SHADER ──────────────────────────────────
+  // ─── Shaders ──────────────────────────────────────
   const vsSource = `#version 300 es
     in vec2 a_position;
     in vec3 a_color;
     out vec3 v_color;
     uniform float u_time;
     void main() {
-      // Warp geometry with trig insanity
       vec2 pos = a_position;
       float wave = sin(pos.x * 30.0 + u_time * 5.0) * 0.1;
       wave += cos(pos.y * 25.0 + u_time * 4.0) * 0.1;
@@ -151,7 +162,6 @@ function createWebGLContext() {
       v_color = a_color + vec3(sin(u_time + pos.x * 50.0), cos(u_time + pos.y * 50.0), 0.0) * 0.3;
     }`;
 
-  // ─── FRAGMENT SHADER (EVEN MORE BRUTAL) ─────────────
   const fsSource = `#version 300 es
     precision highp float;
     precision highp int;
@@ -160,7 +170,6 @@ function createWebGLContext() {
     uniform float u_time;
     uniform int u_pass;
 
-    // ── EXTREME NOISE ──────────────────────────────────
     float hash(vec3 p) {
       p = fract(p * 0.3183099 + 0.1);
       p *= 17.0;
@@ -182,7 +191,6 @@ function createWebGLContext() {
     float fbm(vec3 p) {
       float v = 0.0;
       float a = 0.5;
-      // INCREASED LOOPS: 18 → 25
       for (int i = 0; i < 25; i++) {
         v += a * noise3D(p);
         p *= 2.7;
@@ -194,10 +202,8 @@ function createWebGLContext() {
     float trigHell(vec3 p, float t) {
       float v = 0.0;
       float amp = 1.0;
-      // INCREASED: 110 → 250
       for (int i = 0; i < 250; i++) {
         float fi = float(i);
-        // More trig operations
         v += amp * sin(p.x * 13.7 + t * 2.4 + fi * 0.1);
         v += amp * cos(p.y * 16.9 + t * 2.8 + fi * 0.13);
         v += amp * tan(atan(p.z * 10.3 + t * 1.6 + fi * 0.07) * 1.4);
@@ -207,7 +213,6 @@ function createWebGLContext() {
         v = fract(v * 1.6180339887);
         amp *= 0.37;
         p += vec3(sin(t * 0.9 + fi * 0.02), cos(t * 1.3 + fi * 0.025), tan(t * 0.7 + fi * 0.015));
-        // Extra chaos
         p = abs(p) - 0.5;
         p = vec3(sin(p.x + t), cos(p.y + t), tan(p.z + t));
       }
@@ -217,11 +222,9 @@ function createWebGLContext() {
     float raymarch(vec3 ro, vec3 rd, float t) {
       float dist = 0.0;
       float accum = 0.0;
-      // INCREASED: 420 → 600
       for (int i = 0; i < 600; i++) {
         vec3 p = ro + rd * dist;
         float density = abs(trigHell(p * 3.8 + t * 1.6, t)) * 0.12;
-        // More operations per step
         density += abs(sin(p.x * 50.0 + t * 20.0) * cos(p.y * 50.0 + t * 15.0)) * 0.02;
         density += abs(cos(p.z * 45.0 + t * 18.0) * sin(p.x * 55.0 + t * 22.0)) * 0.02;
         accum += density * exp(-dist * 0.018);
@@ -237,7 +240,6 @@ function createWebGLContext() {
       vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
       float t = u_time * 0.5 + float(u_pass) * 0.15;
       
-      // Crazy camera path
       vec3 ro = vec3(
         sin(t * 0.8) * 8.0 * cos(t * 0.3),
         cos(t * 0.6) * 5.0 + sin(t * 0.4) * 2.0,
@@ -248,7 +250,6 @@ function createWebGLContext() {
         1.9 + sin(t * 0.5) * 0.8 + cos(uv.x * 5.0 + t) * 0.2
       ));
 
-      // Multiple ray samples per pixel (anti-aliasing torture)
       float total = 0.0;
       for (int s = 0; s < 4; s++) {
         float fi = float(s);
@@ -258,29 +259,22 @@ function createWebGLContext() {
       }
       total /= 4.0;
 
-      // Extreme color processing
       vec3 col = 0.5 + 0.5 * vec3(
         sin(total * 5.1 + t * 2.4 + total * 2.0),
         cos(total * 6.8 + t * 2.1 + total * 1.5),
         sin(total * 4.7 + t * 1.2 + total * 3.0)
       );
       
-      // Additional color torture
       col += vec3(
         sin(total * 50.0 + t * 30.0) * 0.05,
         cos(total * 45.0 + t * 25.0) * 0.05,
         sin(total * 55.0 + t * 35.0) * 0.05
       );
       
-      // VHS-like distortion
       float scanline = sin(uv.y * 1200.0 + t * 200.0) * 0.03;
       col += scanline;
-      
-      // Bloom torture
       float bloom = exp(-total * 0.5) * 0.1;
       col += bloom;
-
-      // Tone mapping with extreme curves
       col = pow(col, vec3(0.8 + 0.3 * sin(t * 0.1)));
       col = col / (col + 0.8);
       
@@ -297,8 +291,7 @@ function createWebGLContext() {
 
   if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS) || !gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
     console.error(gl.getShaderInfoLog(vs) || gl.getShaderInfoLog(fs));
-    ensureStatusTimer();
-    if (statusEl) statusEl.textContent = "SHADER FAILED - GPU SAID FUCK OFF";
+    setStatus('Shader failed!', 'idle');
     return false;
   }
 
@@ -309,15 +302,13 @@ function createWebGLContext() {
 
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     console.error(gl.getProgramInfoLog(program));
-    ensureStatusTimer();
-    if (statusEl) statusEl.textContent = "LINK FAILED - PROGRAM INVALID";
+    setStatus('Link failed!', 'idle');
     return false;
   }
 
   gl.useProgram(program);
 
-  // ─── EXTREME GEOMETRY ──────────────────────────────
-  // Generate super dense grid (100x100 = 10,000 vertices)
+  // ─── Geometry ─────────────────────────────────────
   const gridSize = 80;
   const vertices = [];
   const colors = [];
@@ -361,7 +352,7 @@ function createWebGLContext() {
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexData), gl.STATIC_DRAW);
 
-  // ─── TEXTURE BOMB ────────────────────────────────────
+  // ─── Texture Bomb ─────────────────────────────────
   try {
     for (let i = 0; i < 30; i++) {
       const size = 2048;
@@ -380,7 +371,7 @@ function createWebGLContext() {
     }
   } catch(e) {}
 
-  // ─── MEMORY BOMB ─────────────────────────────────────
+  // ─── Memory Bomb ──────────────────────────────────
   try {
     for (let i = 0; i < TORTURE.memoryChunks; i++) {
       const size = 1024 * 1024;
@@ -394,7 +385,7 @@ function createWebGLContext() {
     }
   } catch(e) {}
 
-  // ─── EXTRA BUFFERS ────────────────────────────────────
+  // ─── Extra Buffers ────────────────────────────────
   try {
     for (let i = 0; i < 20; i++) {
       const buf = gl.createBuffer();
@@ -404,7 +395,7 @@ function createWebGLContext() {
     }
   } catch(e) {}
 
-  // ─── WORKER TORTURE ──────────────────────────────────
+  // ─── Worker Torture ──────────────────────────────
   if (TORTURE.workerSpam) {
     try {
       const workerCode = `
@@ -438,10 +429,14 @@ function createWebGLContext() {
   return true;
 }
 
+// ─── RENDER LOOP ──────────────────────────────────
 function render(now) {
   if (!isRunning || !gl || !program) return;
 
-  // ─── MULTIPLE RENDER PASSES ──────────────────────────
+  const elapsed = (now - startTime) / 1000;
+  const heat = Math.min(100, (elapsed / 10) * 40 + 20 + Math.random() * 10);
+
+  // ─── Multiple Render Passes ──────────────────────
   for (let pass = 0; pass < TORTURE.renderPasses; pass++) {
     gl.viewport(0, 0, canvas.width, canvas.height);
     const resLoc = gl.getUniformLocation(program, 'u_resolution');
@@ -449,57 +444,55 @@ function render(now) {
     const passLoc = gl.getUniformLocation(program, 'u_pass');
     
     if (resLoc) gl.uniform2f(resLoc, canvas.width, canvas.height);
-    if (timeLoc) gl.uniform1f(timeLoc, (now - startTime) / 1000 + pass * 0.1);
+    if (timeLoc) gl.uniform1f(timeLoc, elapsed + pass * 0.1);
     if (passLoc) gl.uniform1i(passLoc, pass);
     
-    // Draw with indexed geometry (more vertices = more torture)
     const indexCount = 80 * 80 * 6;
     gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
   }
 
   frameCount++;
-  if (frameCount % 5 === 0) {
-    const fps = Math.round(1000 / (now - lastFrameTime));
-    ensureStatusTimer();
-    const passInfo = TORTURE.renderPasses > 1 ? ` (${TORTURE.renderPasses}x passes)` : '';
-    if (statusEl) {
-      statusEl.textContent = `☠️ MURDERING GPU... ${fps} FPS${passInfo}`;
-      statusEl.style.border = fps < 10 ? '1px solid #ff0044' : '1px solid #ff8800';
-      statusEl.style.color = fps < 10 ? '#ff0044' : '#ff8800';
-    }
-    lastFrameTime = now;
-  }
+  totalFrames++;
 
-  ensureStatusTimer();
-  if (timeEl) timeEl.textContent = formatTime(now - startTime);
+  // ─── Update Metrics ──────────────────────────────
+  if (now - lastFpsUpdate > 200) {
+    const fps = Math.round(frameCount / ((now - lastFpsUpdate) / 1000));
+    setMetrics(fps, now - startTime, heat);
+    
+    // Update status
+    if (fps < 10) {
+      setStatus(`☠️ MURDERING GPU - ${fps} FPS`, 'running');
+    } else if (fps < 25) {
+      setStatus(`🔥 KILLING GPU - ${fps} FPS`, 'running');
+    } else {
+      setStatus(`⚡ DESTROYING GPU - ${fps} FPS`, 'running');
+    }
+    
+    frameCount = 0;
+    lastFpsUpdate = now;
+  }
 
   animFrameId = requestAnimationFrame(render);
 }
 
+// ─── START / STOP ──────────────────────────────────
 function startNuke() {
   if (isRunning) {
     setIdle();
-    ensureStatusTimer();
-    if (statusEl) statusEl.textContent = "🛑 STOPPED - YOU SURVIVED... THIS TIME";
-    if (timeEl) timeEl.textContent = '--:--.---';
-    if (stopBtn) stopBtn.style.display = 'none';
+    setStatus('Stopped - You survived... this time', 'idle');
     return;
   }
 
   isRunning = true;
   if (crashBtn) {
-    crashBtn.disabled = false;
-    crashBtn.textContent = "⛔ STOP MURDER";
+    crashBtn.className = 'crash-btn running';
+    btnLabel.textContent = 'KILLING...';
+    document.querySelector('.crash-btn .icon').textContent = '☠️';
   }
-  if (stopBtn) stopBtn.style.display = 'inline-block';
-
-  ensureStatusTimer();
-  if (statusEl) {
-    statusEl.textContent = "☠️ GPU MURDER INITIATED - HOLD TIGHT";
-    statusEl.style.border = '1px solid #ff0044';
-    statusEl.style.color = '#ff0044';
-  }
-  if (timeEl) timeEl.textContent = formatTime(0);
+  if (stopBtn) stopBtn.style.display = 'flex';
+  
+  setStatus('☠️ GPU MURDER INITIATED', 'crashed');
+  setMetrics(0, 0, 0);
 
   if (!createWebGLContext()) {
     setIdle();
@@ -508,55 +501,65 @@ function startNuke() {
 
   startTime = performance.now();
   frameCount = 0;
-  lastFrameTime = startTime;
+  totalFrames = 0;
+  lastFpsUpdate = startTime;
   requestAnimationFrame(render);
 }
 
-// ──────────────────────────────────────────────
+function stopNuke() {
+  setIdle();
+  setStatus('Stopped - You survived... this time', 'idle');
+  if (stopBtn) stopBtn.style.display = 'none';
+  if (crashBtn) {
+    crashBtn.className = 'crash-btn';
+    btnLabel.textContent = 'Crash GPU';
+    document.querySelector('.crash-btn .icon').textContent = '⚡';
+  }
+}
+
+// ─── EVENT LISTENERS ──────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  crashBtn = document.getElementById('crashBtn');
-  stopBtn  = document.getElementById('stopBtn');
-  statusEl = document.getElementById('status');
-  timeEl   = document.getElementById('time');
-
-  if (!crashBtn) {
-    console.error("No #crashBtn element found");
-    ensureStatusTimer();
-    if (statusEl) statusEl.textContent = "MISSING CRASH BUTTON - ADD TO HTML";
-    return;
+  // Button events
+  if (crashBtn) {
+    crashBtn.addEventListener('click', startNuke);
   }
-
-  crashBtn.onclick = startNuke;
-
+  
   if (stopBtn) {
-    stopBtn.onclick = () => {
-      setIdle();
-      ensureStatusTimer();
-      if (statusEl) statusEl.textContent = "🛑 STOPPED - YOU SURVIVED... THIS TIME";
-      if (timeEl) timeEl.textContent = '--:--.---';
-      if (stopBtn) stopBtn.style.display = 'none';
-      if (crashBtn) crashBtn.textContent = "💀 CRASH GPU NOW";
-    };
+    stopBtn.addEventListener('click', stopNuke);
   }
 
-  // Dummy worker (kept for compatibility)
-  try {
-    if (worker) worker.terminate();
-    worker = new Worker(URL.createObjectURL(new Blob([`
-      onmessage = function(e) {
-        if (e.data[0] === "ping") postMessage(["pong"]);
-      };
-    `], {type: 'text/javascript'})));
-  } catch (e) {}
-
-  window.addEventListener('resize', () => {
-    if (canvas) {
-      const scale = 6.0;
-      canvas.width = window.innerWidth * scale;
-      canvas.height = window.innerHeight * scale;
-      if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      startNuke();
+    }
+    if (e.key === 'Escape' || e.key === 's' || e.key === 'S') {
+      e.preventDefault();
+      stopNuke();
     }
   });
 
+  // Resize handler
+  window.addEventListener('resize', () => {
+    if (canvas && gl) {
+      const scale = 6.0;
+      canvas.width = window.innerWidth * scale;
+      canvas.height = window.innerHeight * scale;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+  });
+
+  // Initialize
   setIdle();
 });
+
+// ─── DUMMY WORKER (for compatibility) ──────────────
+try {
+  if (worker) worker.terminate();
+  worker = new Worker(URL.createObjectURL(new Blob([`
+    onmessage = function(e) {
+      if (e.data[0] === "ping") postMessage(["pong"]);
+    };
+  `], {type: 'text/javascript'})));
+} catch (e) {}
