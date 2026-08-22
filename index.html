@@ -26,6 +26,143 @@
       pointer-events: none;
       opacity: 0.5;
     }
+    
+    /* ─── GLITCH OVERLAY ────────────────────────────────── */
+    #glitchOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      pointer-events: none;
+      mix-blend-mode: screen;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    #glitchOverlay.active {
+      opacity: 1;
+    }
+    
+    /* ─── SCANLINES ────────────────────────────────────── */
+    #scanlines {
+      position: fixed;
+      inset: 0;
+      z-index: 998;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.3) 2px,
+        rgba(0, 0, 0, 0.3) 4px
+      );
+      opacity: 0;
+      transition: opacity 0.5s;
+    }
+    #scanlines.active {
+      opacity: 1;
+    }
+    
+    /* ─── GLITCH FRAMES ────────────────────────────────── */
+    .glitch-frame {
+      position: fixed;
+      pointer-events: none;
+      z-index: 997;
+      background: rgba(255, 0, 255, 0.05);
+      border: 1px solid rgba(255, 0, 255, 0.1);
+      animation: none;
+    }
+    
+    @keyframes glitch1 {
+      0% { transform: translate(0, 0) scale(1); opacity: 0; }
+      10% { transform: translate(-20px, 5px) scale(1.02); opacity: 0.8; }
+      20% { transform: translate(15px, -10px) scale(0.98); opacity: 0.6; }
+      30% { transform: translate(-5px, 8px) scale(1.01); opacity: 1; }
+      40% { transform: translate(10px, -3px) scale(0.99); opacity: 0.7; }
+      50% { transform: translate(-15px, 2px) scale(1.03); opacity: 0.9; }
+      60% { transform: translate(5px, -8px) scale(0.97); opacity: 0.5; }
+      70% { transform: translate(-8px, 12px) scale(1.02); opacity: 1; }
+      80% { transform: translate(12px, -5px) scale(0.98); opacity: 0.6; }
+      90% { transform: translate(-3px, 6px) scale(1.01); opacity: 0.8; }
+      100% { transform: translate(0, 0) scale(1); opacity: 0; }
+    }
+    
+    @keyframes glitch2 {
+      0% { transform: translate(0, 0) skewX(0deg); opacity: 0; }
+      15% { transform: translate(30px, -8px) skewX(5deg); opacity: 0.7; }
+      30% { transform: translate(-25px, 12px) skewX(-3deg); opacity: 0.5; }
+      45% { transform: translate(18px, -5px) skewX(8deg); opacity: 0.9; }
+      60% { transform: translate(-12px, 8px) skewX(-6deg); opacity: 0.6; }
+      75% { transform: translate(22px, -12px) skewX(4deg); opacity: 1; }
+      90% { transform: translate(-8px, 4px) skewX(-2deg); opacity: 0.4; }
+      100% { transform: translate(0, 0) skewX(0deg); opacity: 0; }
+    }
+    
+    @keyframes glitch3 {
+      0% { transform: translate(0, 0) scaleY(1); opacity: 0; }
+      20% { transform: translate(-40px, 0) scaleY(0.3); opacity: 0.9; }
+      40% { transform: translate(35px, 0) scaleY(0.5); opacity: 0.7; }
+      60% { transform: translate(-20px, 0) scaleY(0.2); opacity: 1; }
+      80% { transform: translate(25px, 0) scaleY(0.4); opacity: 0.8; }
+      100% { transform: translate(0, 0) scaleY(1); opacity: 0; }
+    }
+    
+    @keyframes glitchColor {
+      0% { background: rgba(255, 0, 255, 0.1); }
+      25% { background: rgba(0, 255, 255, 0.1); }
+      50% { background: rgba(255, 255, 0, 0.1); }
+      75% { background: rgba(0, 255, 0, 0.1); }
+      100% { background: rgba(255, 0, 255, 0.1); }
+    }
+    
+    @keyframes flicker {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    
+    /* ─── CORRUPTION TEXT ────────────────────────────────── */
+    .corrupt-text {
+      position: fixed;
+      z-index: 996;
+      pointer-events: none;
+      font-family: 'Courier New', monospace;
+      font-weight: 900;
+      font-size: 12px;
+      color: rgba(255, 0, 255, 0.3);
+      text-shadow: 0 0 10px rgba(255, 0, 255, 0.2);
+      letter-spacing: -2px;
+      opacity: 0;
+      animation: none;
+    }
+    
+    @keyframes corruptText {
+      0% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+      10% { opacity: 1; transform: translate(-10px, 5px) rotate(2deg); }
+      20% { opacity: 0.8; transform: translate(15px, -8px) rotate(-3deg); }
+      30% { opacity: 1; transform: translate(-5px, 12px) rotate(1deg); }
+      40% { opacity: 0.6; transform: translate(8px, -3px) rotate(-1deg); }
+      50% { opacity: 1; transform: translate(-12px, 6px) rotate(3deg); }
+      60% { opacity: 0.7; transform: translate(20px, -10px) rotate(-2deg); }
+      70% { opacity: 1; transform: translate(-8px, 4px) rotate(0deg); }
+      80% { opacity: 0.5; transform: translate(5px, -6px) rotate(1deg); }
+      90% { opacity: 0.9; transform: translate(-15px, 8px) rotate(-1deg); }
+      100% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+    }
+    
+    /* ─── RGB SPLIT ────────────────────────────────────── */
+    .rgb-split {
+      position: fixed;
+      inset: 0;
+      z-index: 995;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    .rgb-split.active {
+      opacity: 1;
+    }
+    .rgb-split .r { position: absolute; inset: 0; background: rgba(255, 0, 0, 0.05); transform: translate(3px, 0); mix-blend-mode: screen; }
+    .rgb-split .g { position: absolute; inset: 0; background: rgba(0, 255, 0, 0.05); transform: translate(-3px, 0); mix-blend-mode: screen; }
+    .rgb-split .b { position: absolute; inset: 0; background: rgba(0, 0, 255, 0.05); transform: translate(0, 0); mix-blend-mode: screen; }
+
     .glow-orb {
       position: fixed;
       border-radius: 50%;
@@ -282,6 +419,10 @@
       border-radius: 16px;
       min-width: 320px;
       justify-content: center;
+      transition: all 0.3s ease;
+    }
+    .metrics.glitching .value {
+      animation: flicker 0.05s infinite;
     }
     .metric-item {
       text-align: center;
@@ -330,6 +471,9 @@
       background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444);
       border-radius: 4px;
       transition: width 0.3s ease;
+    }
+    .load-bar.glitching {
+      animation: flicker 0.1s infinite;
     }
     .footer {
       display: flex;
@@ -385,7 +529,6 @@
       border: 1px solid rgba(255, 255, 255, 0.06);
       font-family: 'Inter', sans-serif;
     }
-    /* ─── PIP BUTTON ────────────────────────────────────── */
     .pip-btn {
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -453,6 +596,15 @@
   <div class="glow-orb glow-orb-2"></div>
   <div class="glow-orb glow-orb-3"></div>
   <div class="glow-overlay"></div>
+
+  <!-- ─── GLITCH OVERLAYS ────────────────────────────────── -->
+  <div id="scanlines"></div>
+  <div class="rgb-split" id="rgbSplit">
+    <div class="r"></div>
+    <div class="g"></div>
+    <div class="b"></div>
+  </div>
+  <div id="glitchOverlay"></div>
 
   <div class="container">
     <div class="logo-section">
@@ -584,18 +736,168 @@
       animate();
     })();
 
-    // ─── PICTURE-IN-PICTURE SUPPORT ────────────────────────
+    // ─── GLITCH SYSTEM ──────────────────────────────────────
+    const glitchSystem = {
+      isRunning: false,
+      interval: null,
+      elements: [],
+      
+      start() {
+        if (this.isRunning) return;
+        this.isRunning = true;
+        this.elements = [];
+        
+        // Activate overlays
+        document.getElementById('scanlines').classList.add('active');
+        document.getElementById('rgbSplit').classList.add('active');
+        document.querySelector('.metrics')?.classList.add('glitching');
+        document.getElementById('loadBar')?.classList.add('glitching');
+        
+        // Create glitch frames
+        this.createGlitchFrames();
+        
+        // Start random glitch intervals
+        this.interval = setInterval(() => {
+          this.randomGlitch();
+        }, 200);
+      },
+      
+      stop() {
+        this.isRunning = false;
+        if (this.interval) {
+          clearInterval(this.interval);
+          this.interval = null;
+        }
+        document.getElementById('scanlines').classList.remove('active');
+        document.getElementById('rgbSplit').classList.remove('active');
+        document.querySelector('.metrics')?.classList.remove('glitching');
+        document.getElementById('loadBar')?.classList.remove('glitching');
+        document.getElementById('glitchOverlay').classList.remove('active');
+        
+        // Remove all glitch elements
+        this.elements.forEach(el => el.remove());
+        this.elements = [];
+      },
+      
+      createGlitchFrames() {
+        const positions = [
+          { top: 0, left: 0, width: 100, height: 5 },
+          { top: 20, left: 0, width: 100, height: 3 },
+          { top: 45, left: 0, width: 100, height: 7 },
+          { top: 70, left: 0, width: 100, height: 4 },
+          { top: 88, left: 0, width: 100, height: 6 },
+          { top: 10, left: 10, width: 30, height: 2 },
+          { top: 55, left: 60, width: 25, height: 3 },
+        ];
+        
+        positions.forEach((pos, index) => {
+          const el = document.createElement('div');
+          el.className = 'glitch-frame';
+          Object.assign(el.style, {
+            top: pos.top + '%',
+            left: pos.left + '%',
+            width: pos.width + '%',
+            height: pos.height + 'px',
+            animation: `glitch${(index % 3) + 1} ${1 + Math.random() * 2}s ease-in-out infinite`,
+            animationDelay: `${Math.random() * 2}s`
+          });
+          if (index % 2 === 0) {
+            el.style.background = 'rgba(255, 0, 255, 0.05)';
+            el.style.border = '1px solid rgba(255, 0, 255, 0.1)';
+          } else {
+            el.style.background = 'rgba(0, 255, 255, 0.05)';
+            el.style.border = '1px solid rgba(0, 255, 255, 0.1)';
+          }
+          document.body.appendChild(el);
+          this.elements.push(el);
+        });
+      },
+      
+      randomGlitch() {
+        if (!this.isRunning) return;
+        
+        const type = Math.floor(Math.random() * 5);
+        
+        switch(type) {
+          case 0: // Full screen flicker
+            document.getElementById('glitchOverlay').classList.add('active');
+            setTimeout(() => {
+              document.getElementById('glitchOverlay').classList.remove('active');
+            }, 50 + Math.random() * 100);
+            break;
+            
+          case 1: // RGB split burst
+            document.getElementById('rgbSplit').classList.add('active');
+            setTimeout(() => {
+              document.getElementById('rgbSplit').classList.remove('active');
+            }, 100 + Math.random() * 200);
+            break;
+            
+          case 2: // Scanline flash
+            document.getElementById('scanlines').style.opacity = '0';
+            setTimeout(() => {
+              document.getElementById('scanlines').style.opacity = '1';
+            }, 50);
+            break;
+            
+          case 3: // Random glitch frame
+            const frame = document.createElement('div');
+            frame.className = 'glitch-frame';
+            const size = 10 + Math.random() * 30;
+            Object.assign(frame.style, {
+              top: Math.random() * 100 + '%',
+              left: Math.random() * 100 + '%',
+              width: size + 'vw',
+              height: (2 + Math.random() * 6) + 'px',
+              background: `rgba(${Math.random()*255}, ${Math.random()*255}, ${Math.random()*255}, 0.1)`,
+              border: `1px solid rgba(${Math.random()*255}, ${Math.random()*255}, ${Math.random()*255}, 0.2)`,
+              animation: 'none',
+              zIndex: '997',
+              pointerEvents: 'none',
+              position: 'fixed'
+            });
+            document.body.appendChild(frame);
+            setTimeout(() => {
+              frame.remove();
+            }, 100 + Math.random() * 300);
+            break;
+            
+          case 4: // Corrupt text
+            const text = document.createElement('div');
+            text.className = 'corrupt-text';
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+{}:<>?';
+            let corruptStr = '';
+            for (let i = 0; i < 50 + Math.random() * 100; i++) {
+              corruptStr += chars[Math.floor(Math.random() * chars.length)];
+            }
+            text.textContent = corruptStr;
+            Object.assign(text.style, {
+              top: Math.random() * 100 + '%',
+              left: Math.random() * 100 + '%',
+              fontSize: (8 + Math.random() * 20) + 'px',
+              color: `rgba(${Math.random()*255}, ${Math.random()*255}, ${Math.random()*255}, ${0.3 + Math.random() * 0.5})`,
+              animation: `corruptText ${1 + Math.random() * 2}s ease-in-out`,
+              zIndex: '996'
+            });
+            document.body.appendChild(text);
+            setTimeout(() => {
+              text.remove();
+            }, 2000);
+            break;
+        }
+      }
+    };
+
+    // ─── PICTURE-IN-PICTURE ─────────────────────────────────
     document.addEventListener('DOMContentLoaded', function() {
       const pipBtn = document.getElementById('pipBtn');
       
-      // Show PiP button if supported
       if (document.pictureInPictureEnabled) {
         pipBtn.classList.add('show');
       }
 
       pipBtn.addEventListener('click', async function() {
         try {
-          // Find the video element or create one for PiP
           let video = document.getElementById('pipVideo');
           if (!video) {
             video = document.createElement('video');
@@ -604,13 +906,11 @@
             video.setAttribute('playsinline', '');
             video.setAttribute('webkit-playsinline', '');
             
-            // Create a canvas stream for PiP
             const canvas = document.querySelector('canvas:not(#bgCanvas)');
             if (canvas) {
               const stream = canvas.captureStream(30);
               video.srcObject = stream;
             } else {
-              // Fallback: create a dummy canvas
               const dummyCanvas = document.createElement('canvas');
               dummyCanvas.width = 320;
               dummyCanvas.height = 180;
@@ -635,6 +935,9 @@
           console.log('PiP error:', err);
         }
       });
+
+      // Expose glitch system globally for crasher.js
+      window.glitchSystem = glitchSystem;
     });
   </script>
 </body>
