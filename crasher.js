@@ -210,7 +210,6 @@ function render(now) {
 
 function startNuke() {
   if (isRunning) {
-    // If already running → treat as stop
     setIdle();
     ensureStatusTimer();
     if (statusEl) statusEl.textContent = "Stopped – you survived... this time";
@@ -221,7 +220,7 @@ function startNuke() {
 
   isRunning = true;
   if (crashBtn) {
-    crashBtn.disabled = false; // allow clicking to stop
+    crashBtn.disabled = false;
     crashBtn.textContent = "Stop Crashing";
   }
   if (stopBtn) stopBtn.style.display = 'inline-block';
@@ -235,14 +234,13 @@ function startNuke() {
     return;
   }
 
-  startTime = performance.now();  // ← timer starts RIGHT HERE when button is pressed
+  startTime = performance.now();
   frameCount = 0;
   lastFrameTime = startTime;
   requestAnimationFrame(render);
 }
 
 // ──────────────────────────────────────────────
-// Wait for DOM
 document.addEventListener('DOMContentLoaded', () => {
   crashBtn = document.getElementById('crashBtn');
   stopBtn  = document.getElementById('stopBtn');
@@ -269,7 +267,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  // Dummy worker
   try {
     if (worker) worker.terminate();
     worker = new Worker(URL.createObjectURL(new Blob([`
@@ -279,7 +276,6 @@ document.addEventListener('DOMContentLoaded', () => {
     `], {type: 'text/javascript'})));
   } catch (e) {}
 
-  // Resize handling
   window.addEventListener('resize', () => {
     if (canvas) {
       const scale = 4.0;
