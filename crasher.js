@@ -1,4 +1,4 @@
-// ─── ORIGINAL CODE - CRANKED TO 11 (SE 3rd Gen GUARANTEED) ──
+// ─── YOUR ORIGINAL CODE - CRANKED UP ──────────────────────
 let worker = null;
 let isRunning = false;
 
@@ -6,11 +6,6 @@ let crashBtn = null;
 let stopBtn = null;
 let statusEl = null;
 let timeEl = null;
-let fpsEl = null;
-let loadEl = null;
-let loadBar = null;
-let loadBarContainer = null;
-let btnSub = null;
 
 let gl = null;
 let program = null;
@@ -19,29 +14,14 @@ let startTime = 0;
 let animFrameId = null;
 let frameCount = 0;
 let lastFrameTime = 0;
-let lastFpsUpdate = 0;
 
-// ─── DETECT IPHONE ──────────────────────────────────────
-const isIPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) || 
-                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
-// ─── IPHONE SE 3RD GEN DETECTION ──────────────────────
-const isIPhoneSE = /iPhone/.test(navigator.userAgent) && 
-                   (navigator.userAgent.includes('iPhone13,2') || 
-                    navigator.userAgent.includes('iPhone14,6'));
-
-// ─── TORTURE CONFIG ──────────────────────────────────────
-const CONFIG = {
-  // SE 3rd Gen gets SIMPLEST shader but MAXIMUM passes
-  shaderLoops: isIPhoneSE ? 50 : (isIPhone ? 200 : 110),
-  raymarchSteps: isIPhoneSE ? 150 : (isIPhone ? 600 : 420),
-  renderPasses: isIPhoneSE ? 30 : (isIPhone ? 12 : 1),  // 30 PASSES on SE!
-  resolutionScale: isIPhoneSE ? 10.0 : (isIPhone ? 6.0 : 4.0), // 10x resolution!
-  memoryChunks: isIPhoneSE ? 600 : (isIPhone ? 400 : 0)
+// ─── CRANKED UP CONFIG ──────────────────────────────────
+const CRANK = {
+  shaderLoops: 150,        // was 110
+  raymarchSteps: 500,      // was 420
+  renderPasses: 6,         // was 1 (MULTIPLE PASSES)
+  resolutionScale: 5.0     // was 4.0
 };
-
-// ─── MEMORY BOMB ──────────────────────────────────────────
-let memoryBomb = [];
 
 // ──────────────────────────────────────────────
 function ensureStatusTimer() {
@@ -50,21 +30,6 @@ function ensureStatusTimer() {
   }
   if (!timeEl) {
     timeEl = document.getElementById('timeValue');
-  }
-  if (!fpsEl) {
-    fpsEl = document.getElementById('fpsValue');
-  }
-  if (!loadEl) {
-    loadEl = document.getElementById('loadValue');
-  }
-  if (!loadBar) {
-    loadBar = document.getElementById('loadBar');
-  }
-  if (!loadBarContainer) {
-    loadBarContainer = document.getElementById('loadBarContainer');
-  }
-  if (!btnSub) {
-    btnSub = document.getElementById('btnSub');
   }
 }
 
@@ -84,34 +49,33 @@ function setIdle() {
     crashBtn.className = 'crash-btn';
     document.querySelector('.crash-btn .icon').textContent = '⚡';
     document.getElementById('btnLabel').textContent = 'Crash GPU';
-    if (btnSub) btnSub.textContent = 'Click to initiate meltdown';
   }
   if (stopBtn) stopBtn.style.display = 'none';
   if (animFrameId) {
     cancelAnimationFrame(animFrameId);
     animFrameId = null;
   }
-
-  memoryBomb = [];
-  if (window.gc) {
-    try { window.gc(); } catch(e) {}
-  }
-
   ensureStatusTimer();
   if (statusEl) {
     statusEl.textContent = 'Ready';
     statusEl.style.color = '';
   }
   if (timeEl) timeEl.textContent = '00:00.000';
+  
+  // Reset FPS
+  const fpsEl = document.getElementById('fpsValue');
   if (fpsEl) {
     fpsEl.textContent = '--';
     fpsEl.className = 'value';
   }
+  const loadEl = document.getElementById('loadValue');
   if (loadEl) {
     loadEl.innerHTML = '0<span class="unit">%</span>';
     loadEl.className = 'value';
   }
+  const loadBar = document.getElementById('loadBar');
   if (loadBar) loadBar.style.width = '0%';
+  const loadBarContainer = document.getElementById('loadBarContainer');
   if (loadBarContainer) loadBarContainer.classList.remove('active');
   
   const badge = document.getElementById('statusBadge');
@@ -119,13 +83,6 @@ function setIdle() {
     badge.className = 'status-badge';
     const dot = document.getElementById('statusDot');
     if (dot) dot.style.background = '#22c55e';
-  }
-
-  if (gl) {
-    try {
-      if (program) gl.deleteProgram(program);
-      program = null;
-    } catch(e) {}
   }
 }
 
@@ -140,18 +97,16 @@ function createWebGLContext() {
   canvas.style.opacity = '0.6';
   document.body.prepend(canvas);
 
-  const scale = CONFIG.resolutionScale;
+  const scale = CRANK.resolutionScale;
   canvas.width = window.innerWidth * scale;
   canvas.height = window.innerHeight * scale;
 
-  // Use WebGL1 for ALL iPhones
-  let contextOptions = {
+  gl = canvas.getContext('webgl2', {
     antialias: false,
     powerPreference: 'high-performance',
+    desynchronized: true,
     preserveDrawingBuffer: false
-  };
-
-  gl = canvas.getContext('webgl', contextOptions);
+  }) || canvas.getContext('webgl');
 
   if (!gl) {
     ensureStatusTimer();
@@ -159,44 +114,57 @@ function createWebGLContext() {
     return false;
   }
 
-  // ─── VERTEX SHADER ──────────────────────────────────
-  const vsSource = `
-    attribute vec2 a_position;
+  // ─── VERTEX SHADER (YOUR ORIGINAL) ──────────────────
+  const vsSource = `#version 300 es
+    in vec2 a_position;
     void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
 
-  // ─── FRAGMENT SHADER (SE 3rd Gen - ULTRA SIMPLE) ──
-  // NO pow(), NO atan(), NO fract() - just sin/cos loops
-  const fsSource = `
+  // ─── FRAGMENT SHADER (CRANKED UP) ──────────────────
+  const fsSource = `#version 300 es
     precision highp float;
+    out vec4 fragColor;
     uniform vec2 u_resolution;
     uniform float u_time;
 
+    float trigHell(vec3 p) {
+      float v = 0.0;
+      float amp = 1.0;
+      for (int i = 0; i < ${CRANK.shaderLoops}; i++) {
+        v += amp * sin(p.x * 13.7 + u_time * 2.4);
+        v += amp * cos(p.y * 16.9 + u_time * 2.8);
+        v += amp * tan(atan(p.z * 10.3 + u_time * 1.6) * 1.4);
+        v += amp * sin(cos(tan(v * 4.1)) * 5.3);
+        v = fract(v * 1.6180339887);
+        amp *= 0.39;
+        p += vec3(sin(u_time * 0.9), cos(u_time * 1.3), tan(u_time * 0.7));
+      }
+      return v;
+    }
+
     void main() {
       vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
-      
-      // ULTRA SIMPLE but BRUTAL loop - just sin/cos spam
-      float v = 0.0;
-      for (int i = 0; i < ${CONFIG.shaderLoops}; i++) {
-        float fi = float(i);
-        float x = uv.x * 50.0 + u_time * 5.0 + fi * 0.5;
-        float y = uv.y * 50.0 + u_time * 4.0 + fi * 0.3;
-        v += sin(x) * cos(y);
-        v += cos(x * 1.3 + fi) * sin(y * 1.7 + fi);
-        v = v * 0.5 + 0.5;
+      vec3 ro = vec3(sin(u_time * 0.8) * 5.0, cos(u_time * 1.0) * 4.0, -10.0);
+      vec3 rd = normalize(vec3(uv * 2.2, 1.9 + sin(u_time * 0.5) * 0.5));
+
+      float dist = 0.0;
+      float accum = 0.0;
+
+      for (int i = 0; i < ${CRANK.raymarchSteps}; i++) {
+        vec3 p = ro + rd * dist;
+        float density = abs(trigHell(p * 3.8 + u_time * 1.6)) * 0.12;
+        accum += density * exp(-dist * 0.018);
+        accum += sin(dist * 22.0 + u_time * 7.0) * cos(dist * 15.0) * 0.035;
+        dist += max(0.05, density * 0.42);
+        if (dist > 80.0 || accum > 10.0) break;
       }
-      
-      // Color from the chaos
-      vec3 col = vec3(
-        sin(v * 10.0 + u_time),
-        cos(v * 8.0 + u_time * 0.7),
-        sin(v * 12.0 + u_time * 1.3)
-      ) * 0.5 + 0.5;
-      
-      // Scanline torture
-      float scanline = sin(uv.y * 800.0 + u_time * 100.0) * 0.05;
-      col += scanline;
-      
-      gl_FragColor = vec4(col, 1.0);
+
+      vec3 col = 0.5 + 0.5 * vec3(
+        sin(accum * 5.1 + u_time * 2.4),
+        cos(accum * 6.8 + u_time * 2.1),
+        tan(accum * 4.7 + u_time * 1.2)
+      );
+
+      fragColor = vec4(col, 1.0);
     }`;
 
   const vs = gl.createShader(gl.VERTEX_SHADER);
@@ -239,22 +207,6 @@ function createWebGLContext() {
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-  // ─── MEMORY BOMB ──────────────────────────────────────
-  if (isIPhone && CONFIG.memoryChunks > 0) {
-    try {
-      for (let i = 0; i < CONFIG.memoryChunks; i++) {
-        const size = 1024 * 1024;
-        const chunk = new Uint8Array(size);
-        for (let j = 0; j < size; j += 4096) {
-          chunk[j] = Math.random() * 255;
-          chunk[j+1] = Math.random() * 255;
-          chunk[j+2] = Math.random() * 255;
-        }
-        memoryBomb.push(chunk);
-      }
-    } catch(e) {}
-  }
-
   return true;
 }
 
@@ -262,10 +214,10 @@ function render(now) {
   if (!isRunning || !gl || !program) return;
 
   const elapsed = (now - startTime) / 1000;
-  const heat = Math.min(100, (elapsed / 5) * 50 + 20 + Math.random() * 10);
+  const heat = Math.min(100, (elapsed / 8) * 40 + 20 + Math.random() * 10);
 
-  // ─── MULTIPLE PASSES ──────────────────────────────
-  for (let pass = 0; pass < CONFIG.renderPasses; pass++) {
+  // ─── MULTIPLE RENDER PASSES ──────────────────────────
+  for (let pass = 0; pass < CRANK.renderPasses; pass++) {
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
     gl.uniform1f(gl.getUniformLocation(program, 'u_time'), elapsed + pass * 0.05);
@@ -274,54 +226,53 @@ function render(now) {
 
   frameCount++;
 
-  if (now - lastFpsUpdate > 200) {
-    const fps = Math.round(frameCount / ((now - lastFpsUpdate) / 1000));
+  if (now - lastFrameTime > 200) {
+    const fps = Math.round(frameCount / ((now - lastFrameTime) / 1000));
     const load = Math.min(100, Math.round((1 - fps / 60) * 100 + 20));
     
     ensureStatusTimer();
+    
+    const fpsEl = document.getElementById('fpsValue');
     if (fpsEl) {
       fpsEl.textContent = fps;
       fpsEl.className = 'value' + (fps < 10 ? ' danger' : fps < 25 ? ' warning' : '');
     }
+    
     if (timeEl) timeEl.textContent = formatTime(now - startTime);
+    
+    const loadEl = document.getElementById('loadValue');
     if (loadEl) {
       loadEl.innerHTML = load + '<span class="unit">%</span>';
       loadEl.className = 'value' + (load > 80 ? ' danger' : load > 50 ? ' warning' : '');
     }
+    
+    const loadBar = document.getElementById('loadBar');
     if (loadBar) loadBar.style.width = load + '%';
+    
+    const loadBarContainer = document.getElementById('loadBarContainer');
     if (loadBarContainer) loadBarContainer.classList.add('active');
 
-    // Update status
     if (statusEl) {
-      if (fps < 5) {
-        statusEl.textContent = `💀 SE MELTING - ${fps} FPS`;
+      if (fps < 10) {
+        statusEl.textContent = `☠️ DYING - ${fps} FPS`;
         statusEl.style.color = '#ef4444';
         const badge = document.getElementById('statusBadge');
-        if (badge) { badge.className = 'status-badge active'; }
-      } else if (fps < 10) {
-        statusEl.textContent = `☠️ SE DYING - ${fps} FPS`;
-        statusEl.style.color = '#ef4444';
-        const badge = document.getElementById('statusBadge');
-        if (badge) { badge.className = 'status-badge active'; }
+        if (badge) badge.className = 'status-badge active';
       } else if (fps < 20) {
-        statusEl.textContent = `🔥 SE KILLING - ${fps} FPS`;
+        statusEl.textContent = `🔥 KILLING - ${fps} FPS`;
         statusEl.style.color = '#f59e0b';
         const badge = document.getElementById('statusBadge');
-        if (badge) { badge.className = 'status-badge crashed'; }
+        if (badge) badge.className = 'status-badge crashed';
       } else {
-        statusEl.textContent = `⚡ SE DESTROYING - ${fps} FPS`;
+        statusEl.textContent = `⚡ DESTROYING - ${fps} FPS`;
         statusEl.style.color = '#8b9bb5';
         const badge = document.getElementById('statusBadge');
-        if (badge) { badge.className = 'status-badge active'; }
+        if (badge) badge.className = 'status-badge active';
       }
     }
 
-    if (btnSub) {
-      btnSub.textContent = fps < 10 ? '⚠️ SE under extreme load' : '🔥 30 passes torture';
-    }
-
     frameCount = 0;
-    lastFpsUpdate = now;
+    lastFrameTime = now;
   }
 
   animFrameId = requestAnimationFrame(render);
@@ -340,29 +291,33 @@ function startNuke() {
   isRunning = true;
   if (crashBtn) {
     crashBtn.className = 'crash-btn running';
-    document.querySelector('.crash-btn .icon').textContent = isIPhoneSE ? '🔥' : (isIPhone ? '🔥' : '☠️');
-    document.getElementById('btnLabel').textContent = isIPhoneSE ? '🔥 MELTING SE...' : (isIPhone ? '🔥 MELTING IPHONE...' : '💀 KILLING...');
-    if (btnSub) btnSub.textContent = isIPhoneSE ? '🔥 30 passes · 10x resolution' : '🔥 System at critical';
+    document.querySelector('.crash-btn .icon').textContent = '☠️';
+    document.getElementById('btnLabel').textContent = 'KILLING...';
   }
   if (stopBtn) stopBtn.style.display = 'flex';
 
   ensureStatusTimer();
   if (statusEl) {
-    statusEl.textContent = isIPhoneSE ? '🔥 SE TORTURE MODE (30 passes)' : (isIPhone ? '🔥 IPHONE TORTURE MODE' : '☠️ GPU MURDER INITIATED');
+    statusEl.textContent = '☠️ GPU MURDER INITIATED';
     statusEl.style.color = '#f59e0b';
     const badge = document.getElementById('statusBadge');
-    if (badge) { badge.className = 'status-badge crashed'; }
+    if (badge) badge.className = 'status-badge crashed';
   }
   if (timeEl) timeEl.textContent = '00:00.000';
+  
+  const fpsEl = document.getElementById('fpsValue');
   if (fpsEl) {
     fpsEl.textContent = '0';
     fpsEl.className = 'value';
   }
+  const loadEl = document.getElementById('loadValue');
   if (loadEl) {
     loadEl.innerHTML = '0<span class="unit">%</span>';
     loadEl.className = 'value';
   }
+  const loadBar = document.getElementById('loadBar');
   if (loadBar) loadBar.style.width = '0%';
+  const loadBarContainer = document.getElementById('loadBarContainer');
   if (loadBarContainer) loadBarContainer.classList.add('active');
 
   if (!createWebGLContext()) {
@@ -372,7 +327,7 @@ function startNuke() {
 
   startTime = performance.now();
   frameCount = 0;
-  lastFpsUpdate = startTime;
+  lastFrameTime = startTime;
   requestAnimationFrame(render);
 }
 
@@ -382,25 +337,6 @@ document.addEventListener('DOMContentLoaded', () => {
   stopBtn = document.getElementById('stopBtn');
   statusEl = document.getElementById('statusText');
   timeEl = document.getElementById('timeValue');
-  fpsEl = document.getElementById('fpsValue');
-  loadEl = document.getElementById('loadValue');
-  loadBar = document.getElementById('loadBar');
-  loadBarContainer = document.getElementById('loadBarContainer');
-  btnSub = document.getElementById('btnSub');
-
-  // ─── DEVICE BADGE ──────────────────────────────────────
-  const deviceBadge = document.getElementById('deviceBadge');
-  if (deviceBadge) {
-    if (isIPhoneSE) {
-      deviceBadge.textContent = '📱 SE 3RD GEN - 30 PASSES';
-      deviceBadge.classList.add('iphone');
-    } else if (isIPhone) {
-      deviceBadge.textContent = '📱 IPHONE MODE - EXTREME';
-      deviceBadge.classList.add('iphone');
-    } else {
-      deviceBadge.textContent = '💻 DESKTOP MODE';
-    }
-  }
 
   if (!crashBtn) {
     console.error("No #crashBtn element found");
@@ -420,7 +356,6 @@ document.addEventListener('DOMContentLoaded', () => {
         crashBtn.className = 'crash-btn';
         document.querySelector('.crash-btn .icon').textContent = '⚡';
         document.getElementById('btnLabel').textContent = 'Crash GPU';
-        if (btnSub) btnSub.textContent = 'Click to initiate meltdown';
       }
     };
   }
@@ -443,7 +378,6 @@ document.addEventListener('DOMContentLoaded', () => {
           crashBtn.className = 'crash-btn';
           document.querySelector('.crash-btn .icon').textContent = '⚡';
           document.getElementById('btnLabel').textContent = 'Crash GPU';
-          if (btnSub) btnSub.textContent = 'Click to initiate meltdown';
         }
       }
     }
@@ -452,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ─── RESIZE ──────────────────────────────────────────────
   window.addEventListener('resize', () => {
     if (canvas) {
-      const scale = CONFIG.resolutionScale;
+      const scale = CRANK.resolutionScale;
       canvas.width = window.innerWidth * scale;
       canvas.height = window.innerHeight * scale;
       if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
