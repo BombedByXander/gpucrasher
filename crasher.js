@@ -16,27 +16,36 @@ let lastFrameTime = 0;
 
 // ──────────────────────────────────────────────
 function ensureStatusTimer() {
+  // FIXED: Use the correct element IDs from your HTML
   if (!statusEl) {
-    statusEl = document.createElement('div');
-    statusEl.id = 'status';
-    Object.assign(statusEl.style, {
-      position: 'fixed', top: '18px', left: '50%', transform: 'translateX(-50%)',
-      background: 'rgba(0,0,0,0.7)', color: '#dbeafe', padding: '10px 16px',
-      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
-      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
-    });
-    document.body.appendChild(statusEl);
+    statusEl = document.getElementById('statusText');
+    if (!statusEl) {
+      // Fallback: create element if not found
+      statusEl = document.createElement('div');
+      statusEl.id = 'statusText';
+      Object.assign(statusEl.style, {
+        position: 'fixed', top: '18px', left: '50%', transform: 'translateX(-50%)',
+        background: 'rgba(0,0,0,0.7)', color: '#dbeafe', padding: '10px 16px',
+        borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
+        zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
+      });
+      document.body.appendChild(statusEl);
+    }
   }
   if (!timeEl) {
-    timeEl = document.createElement('div');
-    timeEl.id = 'time';
-    Object.assign(timeEl.style, {
-      position: 'fixed', top: '60px', left: '50%', transform: 'translateX(-50%)',
-      background: 'rgba(0,0,0,0.65)', color: '#d1fae5', padding: '8px 14px',
-      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
-      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
-    });
-    document.body.appendChild(timeEl);
+    timeEl = document.getElementById('timeValue');
+    if (!timeEl) {
+      // Fallback: create element if not found
+      timeEl = document.createElement('div');
+      timeEl.id = 'timeValue';
+      Object.assign(timeEl.style, {
+        position: 'fixed', top: '60px', left: '50%', transform: 'translateX(-50%)',
+        background: 'rgba(0,0,0,0.65)', color: '#d1fae5', padding: '8px 14px',
+        borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
+        zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
+      });
+      document.body.appendChild(timeEl);
+    }
   }
 }
 
@@ -244,13 +253,13 @@ function startNuke() {
 document.addEventListener('DOMContentLoaded', () => {
   crashBtn = document.getElementById('crashBtn');
   stopBtn  = document.getElementById('stopBtn');
-  statusEl = document.getElementById('status');
-  timeEl   = document.getElementById('time');
+  
+  // FIXED: Get the correct elements
+  statusEl = document.getElementById('statusText');
+  timeEl = document.getElementById('timeValue');
 
   if (!crashBtn) {
     console.error("No #crashBtn element found");
-    ensureStatusTimer();
-    if (statusEl) statusEl.textContent = "Missing crash button – add it to HTML";
     return;
   }
 
