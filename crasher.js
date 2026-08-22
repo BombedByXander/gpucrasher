@@ -14,38 +14,51 @@ let animFrameId = null;
 let frameCount = 0;
 let lastFrameTime = 0;
 
+// ─── HARDWARE DETECTION ──────────────────────────────────
+function isLowEndDevice() {
+  const isSE = /iPhone13,2|iPhone14,6/.test(navigator.userAgent);
+  const isOlder = /iPhone8|iPhone9|iPhone10|iPhone11|iPhone12/.test(navigator.userAgent);
+  const isLowMemory = navigator.deviceMemory && navigator.deviceMemory < 4;
+  return isSE || isOlder || isLowMemory;
+}
+
+const isLowEnd = isLowEndDevice();
+
+// ─── CONFIG ──────────────────────────────────────────────
+const CONFIG = {
+  // SE gets LESS complexity but MORE passes to compensate
+  shaderLoops: isLowEnd ? 50 : 110,        // SE: 50 loops (was 110)
+  raymarchSteps: isLowEnd ? 200 : 420,     // SE: 200 steps (was 420)
+  renderPasses: isLowEnd ? 15 : 1,         // SE: 15 passes (MORE torture!)
+  resolutionScale: isLowEnd ? 3.0 : 4.0,   // SE: 3x resolution (less pixels)
+  memoryChunks: isLowEnd ? 200 : 0         // SE: 200MB memory bomb
+};
+
+let memoryBomb = [];
+
 // ──────────────────────────────────────────────
 function ensureStatusTimer() {
-  // FIXED: Use the correct element IDs from your HTML
   if (!statusEl) {
-    statusEl = document.getElementById('statusText');
-    if (!statusEl) {
-      // Fallback: create element if not found
-      statusEl = document.createElement('div');
-      statusEl.id = 'statusText';
-      Object.assign(statusEl.style, {
-        position: 'fixed', top: '18px', left: '50%', transform: 'translateX(-50%)',
-        background: 'rgba(0,0,0,0.7)', color: '#dbeafe', padding: '10px 16px',
-        borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
-        zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
-      });
-      document.body.appendChild(statusEl);
-    }
+    statusEl = document.createElement('div');
+    statusEl.id = 'status';
+    Object.assign(statusEl.style, {
+      position: 'fixed', top: '18px', left: '50%', transform: 'translateX(-50%)',
+      background: 'rgba(0,0,0,0.7)', color: '#dbeafe', padding: '10px 16px',
+      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
+      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
+    });
+    document.body.appendChild(statusEl);
   }
   if (!timeEl) {
-    timeEl = document.getElementById('timeValue');
-    if (!timeEl) {
-      // Fallback: create element if not found
-      timeEl = document.createElement('div');
-      timeEl.id = 'timeValue';
-      Object.assign(timeEl.style, {
-        position: 'fixed', top: '60px', left: '50%', transform: 'translateX(-50%)',
-        background: 'rgba(0,0,0,0.65)', color: '#d1fae5', padding: '8px 14px',
-        borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
-        zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
-      });
-      document.body.appendChild(timeEl);
-    }
+    timeEl = document.createElement('div');
+    timeEl.id = 'time';
+    Object.assign(timeEl.style, {
+      position: 'fixed', top: '60px', left: '50%', transform: 'translateX(-50%)',
+      background: 'rgba(0,0,0,0.65)', color: '#d1fae5', padding: '8px 14px',
+      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
+      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
+    });
+    document.body.appendChild(timeEl);
   }
 }
 
@@ -68,6 +81,7 @@ function setIdle() {
     cancelAnimationFrame(animFrameId);
     animFrameId = null;
   }
+  memoryBomb = [];
   ensureStatusTimer();
   if (statusEl) statusEl.textContent = "Idle – ready to burn";
   if (timeEl) timeEl.textContent = formatTime(0);
@@ -83,7 +97,7 @@ function createWebGLContext() {
   canvas.style.pointerEvents = 'none';
   document.body.appendChild(canvas);
 
-  const scale = 4.0;
+  const scale = CONFIG.resolutionScale;
   canvas.width = window.innerWidth * scale;
   canvas.height = window.innerHeight * scale;
 
@@ -104,6 +118,7 @@ function createWebGLContext() {
     in vec2 a_position;
     void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
 
+  // ─── SHADER WITH DYNAMIC LOOPS ──────────────────────────
   const fsSource = `#version 300 es
     precision highp float;
     out vec4 fragColor;
@@ -113,14 +128,14 @@ function createWebGLContext() {
     float trigHell(vec3 p) {
       float v = 0.0;
       float amp = 1.0;
-      for (int i = 0; i < 110; i++) {
+      // SE uses 50 loops, iPhone 16 uses 110
+      for (int i = 0; i < ${CONFIG.shaderLoops}; i++) {
         v += amp * sin(p.x * 13.7 + u_time * 2.4);
         v += amp * cos(p.y * 16.9 + u_time * 2.8);
-        v += amp * tan(atan(p.z * 10.3 + u_time * 1.6) * 1.4);
-        v += amp * sin(cos(tan(v * 4.1)) * 5.3);
-        v = fract(v * 1.6180339887);
+        v += amp * sin(p.z * 10.3 + u_time * 1.6) * cos(p.z * 5.3);
+        v = v * 0.5 + 0.5;
         amp *= 0.39;
-        p += vec3(sin(u_time * 0.9), cos(u_time * 1.3), tan(u_time * 0.7));
+        p += vec3(sin(u_time * 0.9), cos(u_time * 1.3), sin(u_time * 0.7));
       }
       return v;
     }
@@ -133,7 +148,8 @@ function createWebGLContext() {
       float dist = 0.0;
       float accum = 0.0;
 
-      for (int i = 0; i < 420; i++) {
+      // SE uses 200 steps, iPhone 16 uses 420
+      for (int i = 0; i < ${CONFIG.raymarchSteps}; i++) {
         vec3 p = ro + rd * dist;
         float density = abs(trigHell(p * 3.8 + u_time * 1.6)) * 0.12;
         accum += density * exp(-dist * 0.018);
@@ -145,7 +161,7 @@ function createWebGLContext() {
       vec3 col = 0.5 + 0.5 * vec3(
         sin(accum * 5.1 + u_time * 2.4),
         cos(accum * 6.8 + u_time * 2.1),
-        tan(accum * 4.7 + u_time * 1.2)
+        sin(accum * 4.7 + u_time * 1.2)
       );
 
       fragColor = vec4(col, 1.0);
@@ -191,23 +207,48 @@ function createWebGLContext() {
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
+  // ─── MEMORY BOMB (SE only) ──────────────────────────────
+  if (isLowEnd && CONFIG.memoryChunks > 0) {
+    try {
+      for (let i = 0; i < CONFIG.memoryChunks; i++) {
+        const size = 1024 * 1024;
+        const chunk = new Uint8Array(size);
+        for (let j = 0; j < size; j += 4096) {
+          chunk[j] = Math.random() * 255;
+        }
+        memoryBomb.push(chunk);
+      }
+    } catch(e) {}
+  }
+
   return true;
 }
 
 function render(now) {
   if (!isRunning || !gl || !program) return;
 
-  gl.viewport(0, 0, canvas.width, canvas.height);
-  gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
-  gl.uniform1f(gl.getUniformLocation(program, 'u_time'), (now - startTime) / 1000);
+  const elapsed = (now - startTime) / 1000;
+  const heat = Math.min(100, (elapsed / 8) * 40 + 20 + Math.random() * 10);
 
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  // ─── MULTIPLE PASSES (SE gets 15 passes!) ──────────────
+  for (let pass = 0; pass < CONFIG.renderPasses; pass++) {
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
+    gl.uniform1f(gl.getUniformLocation(program, 'u_time'), elapsed + pass * 0.05);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
 
   frameCount++;
   if (frameCount % 10 === 0) {
     const fps = Math.round(1000 / (now - lastFrameTime));
     ensureStatusTimer();
-    if (statusEl) statusEl.textContent = `Nuking... ~${fps} FPS (pray)`;
+    if (statusEl) {
+      if (isLowEnd) {
+        statusEl.textContent = `🔥 SE MELTING - ${fps} FPS (15 passes)`;
+      } else {
+        statusEl.textContent = `Nuking... ~${fps} FPS (pray)`;
+      }
+    }
     lastFrameTime = now;
   }
 
@@ -235,7 +276,13 @@ function startNuke() {
   if (stopBtn) stopBtn.style.display = 'inline-block';
 
   ensureStatusTimer();
-  if (statusEl) statusEl.textContent = "Nuking GPU – hold on tight";
+  if (statusEl) {
+    if (isLowEnd) {
+      statusEl.textContent = "🔥 SE TORTURE MODE (15 passes)";
+    } else {
+      statusEl.textContent = "Nuking GPU – hold on tight";
+    }
+  }
   if (timeEl) timeEl.textContent = formatTime(0);
 
   if (!createWebGLContext()) {
@@ -253,13 +300,13 @@ function startNuke() {
 document.addEventListener('DOMContentLoaded', () => {
   crashBtn = document.getElementById('crashBtn');
   stopBtn  = document.getElementById('stopBtn');
-  
-  // FIXED: Get the correct elements
-  statusEl = document.getElementById('statusText');
-  timeEl = document.getElementById('timeValue');
+  statusEl = document.getElementById('status');
+  timeEl   = document.getElementById('time');
 
   if (!crashBtn) {
     console.error("No #crashBtn element found");
+    ensureStatusTimer();
+    if (statusEl) statusEl.textContent = "Missing crash button – add it to HTML";
     return;
   }
 
@@ -287,7 +334,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.addEventListener('resize', () => {
     if (canvas) {
-      const scale = 4.0;
+      const scale = CONFIG.resolutionScale;
       canvas.width = window.innerWidth * scale;
       canvas.height = window.innerHeight * scale;
       if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
