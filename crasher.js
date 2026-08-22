@@ -20,8 +20,6 @@ let startTime = 0;
 let animFrameId = null;
 let frameCount = 0;
 let lastFpsUpdate = 0;
-let visualCanvas = null;
-let visualCtx = null;
 
 // ─── HARDWARE DETECTION ──────────────────────────────────
 function isLowEndDevice() {
@@ -57,133 +55,6 @@ function formatTime(ms) {
   const seconds = String(Math.floor((total % 60000) / 1000)).padStart(2, '0');
   const millis = String(total % 1000).padStart(3, '0');
   return `${minutes}:${seconds}.${millis}`;
-}
-
-// ─── CZNULL-STYLE VISUAL CHAOS ──────────────────────────
-function startVisualChaos() {
-  // Create the visual canvas overlay
-  visualCanvas = document.createElement('canvas');
-  visualCanvas.style.position = 'fixed';
-  visualCanvas.style.inset = '0';
-  visualCanvas.style.zIndex = '10';
-  visualCanvas.style.pointerEvents = 'none';
-  visualCanvas.style.opacity = '0.85';
-  visualCanvas.style.mixBlendMode = 'screen';
-  document.body.appendChild(visualCanvas);
-  
-  visualCtx = visualCanvas.getContext('2d');
-  
-  // Resize the canvas
-  function resizeVisual() {
-    visualCanvas.width = window.innerWidth;
-    visualCanvas.height = window.innerHeight;
-  }
-  window.addEventListener('resize', resizeVisual);
-  resizeVisual();
-  
-  // Start the visual chaos animation
-  renderVisualChaos();
-}
-
-function renderVisualChaos() {
-  if (!isRunning || !visualCtx) return;
-  
-  const w = visualCanvas.width;
-  const h = visualCanvas.height;
-  const ctx = visualCtx;
-  
-  // Clear with slight trail effect for motion blur
-  ctx.fillStyle = 'rgba(5, 6, 10, 0.15)';
-  ctx.fillRect(0, 0, w, h);
-  
-  const time = (Date.now() - startTime) / 1000;
-  const escalationFactor = 1 + CONFIG.escalationLevel * 0.1;
-  
-  // ─── CZNULL-STYLE POISON MUSHROOM VISUAL ──────────────
-  // Using WebGL-like math in 2D canvas for maximum chaos
-  
-  const centerX = w / 2;
-  const centerY = h / 2;
-  const scale = Math.min(w, h) * 0.3 * escalationFactor;
-  
-  // Draw the "poison mushroom" with trig chaos
-  const imageData = ctx.createImageData(w, h);
-  const data = imageData.data;
-  
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      
-      // Normalize coordinates
-      const nx = (x - centerX) / scale;
-      const ny = (y - centerY) / scale;
-      const nz = 0.5 + 0.5 * Math.sin(time * 0.3);
-      
-      // ─── CZNULL-STYLE TRIG CHAOS ──────────────────────
-      // Massive trig function - this is what makes it "poison mushroom"
-      let v = 0.0;
-      let amp = 1.0;
-      
-      // Dynamic loop count based on escalation
-      const loops = Math.min(80 + CONFIG.escalationLevel * 5, 200);
-      
-      for (let i = 0; i < loops; i++) {
-        const fi = i * 0.01;
-        v += amp * Math.sin(nx * 13.7 + time * 2.4 + fi);
-        v += amp * Math.cos(ny * 16.9 + time * 2.8 + fi * 0.7);
-        v += amp * Math.sin(nz * 10.3 + time * 1.6 + fi * 1.3) * Math.cos(nx * 5.3 + ny * 3.7 + time);
-        v = Math.abs(v) * 0.5 + 0.5;
-        amp *= 0.39;
-      }
-      
-      // Color from chaos - the "poison" colors
-      const r = 0.5 + 0.5 * Math.sin(v * 5.1 + time * 2.4 + nx * 2.0);
-      const g = 0.5 + 0.5 * Math.cos(v * 6.8 + time * 2.1 + ny * 1.5);
-      const b = 0.5 + 0.5 * Math.sin(v * 4.7 + time * 1.2 + nz * 3.0);
-      
-      // ─── ADD MORE CHAOS ──────────────────────────────────
-      // Scanline distortion
-      const scanline = Math.sin(y * 0.5 + time * 20.0) * 0.05;
-      // RGB split effect
-      const split = Math.sin(y * 0.1 + time * 5.0) * 0.02;
-      // VHS noise
-      const noise = Math.random() * 0.05;
-      
-      data[i] = Math.min(1, Math.max(0, r + scanline + split + noise)) * 255;
-      data[i+1] = Math.min(1, Math.max(0, g + scanline - split + noise * 0.8)) * 255;
-      data[i+2] = Math.min(1, Math.max(0, b + scanline + split * 0.5 + noise * 1.2)) * 255;
-      data[i+3] = 255;
-    }
-  }
-  
-  ctx.putImageData(imageData, 0, 0);
-  
-  // ─── ADD GLITCHY TEXT OVERLAY ──────────────────────────
-  if (Math.random() < 0.05) {
-    ctx.fillStyle = 'rgba(255, 0, 255, 0.05)';
-    ctx.fillRect(Math.random() * w, Math.random() * h, Math.random() * 200 + 50, 2 + Math.random() * 8);
-  }
-  
-  // ─── FPS AND STATUS OVERLAY ────────────────────────────
-  if (fpsEl) {
-    const fps = parseInt(fpsEl.textContent) || 0;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fillRect(10, 10, 200, 60);
-    ctx.fillStyle = fps < 10 ? '#ef4444' : fps < 25 ? '#f59e0b' : '#22c55e';
-    ctx.font = '12px monospace';
-    ctx.fillText(`⚡ Level ${CONFIG.escalationLevel}`, 20, 30);
-    ctx.fillText(`🔥 ${CONFIG.renderPasses}x passes`, 20, 50);
-  }
-  
-  requestAnimationFrame(renderVisualChaos);
-}
-
-function stopVisualChaos() {
-  if (visualCanvas) {
-    visualCanvas.remove();
-    visualCanvas = null;
-    visualCtx = null;
-  }
 }
 
 function escalateTorture() {
@@ -264,13 +135,9 @@ function setIdle() {
     animFrameId = null;
   }
 
-  // ─── STOP GLITCHES ──────────────────────────────────────
   if (window.glitchSystem) {
     window.glitchSystem.stop();
   }
-  
-  // ─── STOP VISUAL CHAOS ──────────────────────────────────
-  stopVisualChaos();
 
   memoryBomb = [];
   CONFIG.escalationLevel = 0;
@@ -325,7 +192,7 @@ function createWebGLContext() {
   canvas.style.inset = '0';
   canvas.style.zIndex = '-1';
   canvas.style.pointerEvents = 'none';
-  canvas.style.opacity = '0.6';
+  canvas.style.opacity = '1';
   document.body.prepend(canvas);
 
   const scale = CONFIG.resolutionScale;
@@ -359,6 +226,7 @@ function createWebGLContext() {
   const currentLoops = CONFIG.shaderLoops;
   const currentSteps = CONFIG.raymarchSteps;
 
+  // ─── CZNULL-STYLE POISON MUSHROOM SHADER ──────────────
   if (isWebGL2) {
     vsSource = `#version 300 es
       in vec2 a_position;
@@ -369,51 +237,84 @@ function createWebGLContext() {
       out vec4 fragColor;
       uniform vec2 u_resolution;
       uniform float u_time;
+      uniform int u_pass;
 
-      float trigHell(vec3 p) {
+      // ─── CZNULL-STYLE TRIG CHAOS ──────────────────────
+      float poisonMushroom(vec3 p, float t) {
         float v = 0.0;
         float amp = 1.0;
+        // Dynamic loops - this is what kills the GPU
         for (int i = 0; i < ${currentLoops}; i++) {
           float fi = float(i);
-          v += amp * sin(p.x * 13.7 + u_time * 2.4 + fi * 0.01);
-          v += amp * cos(p.y * 16.9 + u_time * 2.8 + fi * 0.01);
-          v += amp * sin(p.z * 10.3 + u_time * 1.6 + fi * 0.01) * cos(p.z * 5.3 + u_time * 1.2);
+          v += amp * sin(p.x * 13.7 + t * 2.4 + fi * 0.01);
+          v += amp * cos(p.y * 16.9 + t * 2.8 + fi * 0.01);
+          v += amp * sin(p.z * 10.3 + t * 1.6 + fi * 0.01) * cos(p.z * 5.3 + t * 1.2);
           v = v * 0.5 + 0.5;
           amp *= 0.39;
-          p += vec3(sin(u_time * 0.9 + fi * 0.001), cos(u_time * 1.3 + fi * 0.001), sin(u_time * 0.7 + fi * 0.001));
+          p += vec3(sin(t * 0.9 + fi * 0.001), cos(t * 1.3 + fi * 0.001), sin(t * 0.7 + fi * 0.001));
           p = p * 1.001 + 0.001;
+          // Extra chaos on higher escalation
+          if (${CONFIG.escalationLevel} > 5) {
+            p = abs(p) - 0.5;
+          }
         }
         return v;
       }
 
       void main() {
         vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
-        vec3 ro = vec3(sin(u_time * 0.8) * 5.0, cos(u_time * 1.0) * 4.0, -10.0);
-        vec3 rd = normalize(vec3(uv * 2.2, 1.9 + sin(u_time * 0.5) * 0.5));
+        float t = u_time * 0.5 + float(u_pass) * 0.05;
+        
+        // ─── CZNULL CAMERA ORBIT ──────────────────────────
+        vec3 ro = vec3(
+          sin(t * 0.3) * 6.0,
+          cos(t * 0.4) * 4.0 + 2.0,
+          -8.0 + sin(t * 0.2) * 3.0
+        );
+        vec3 rd = normalize(vec3(uv * 2.2, 1.9 + sin(t * 0.5) * 0.5));
 
         float dist = 0.0;
         float accum = 0.0;
 
+        // ─── RAYMARCH THE POISON MUSHROOM ────────────────
         for (int i = 0; i < ${currentSteps}; i++) {
           vec3 p = ro + rd * dist;
-          float density = abs(trigHell(p * 3.8 + u_time * 1.6)) * 0.12;
+          float density = abs(poisonMushroom(p * 3.8 + t * 1.6, t)) * 0.12;
           accum += density * exp(-dist * 0.018);
-          accum += sin(dist * 22.0 + u_time * 7.0) * cos(dist * 15.0) * 0.035;
-          accum += cos(dist * 33.0 + u_time * 9.0) * sin(dist * 27.0) * 0.025;
+          accum += sin(dist * 22.0 + t * 7.0) * cos(dist * 15.0) * 0.035;
+          accum += cos(dist * 33.0 + t * 9.0) * sin(dist * 27.0) * 0.025;
           dist += max(0.02, density * 0.38);
           if (dist > 100.0 || accum > 15.0) break;
         }
 
+        // ─── POISON COLOR PALETTE ──────────────────────────
         vec3 col = 0.5 + 0.5 * vec3(
-          sin(accum * 5.1 + u_time * 2.4 + accum * 2.0),
-          cos(accum * 6.8 + u_time * 2.1 + accum * 1.5),
-          sin(accum * 4.7 + u_time * 1.2 + accum * 3.0)
+          sin(accum * 5.1 + t * 2.4 + accum * 2.0),
+          cos(accum * 6.8 + t * 2.1 + accum * 1.5),
+          sin(accum * 4.7 + t * 1.2 + accum * 3.0)
         );
         
-        col += vec3(sin(accum * 50.0 + u_time * 30.0) * 0.05);
-        float scanline = sin(uv.y * 1200.0 + u_time * 200.0) * 0.03;
+        // ─── POISON GLOW ──────────────────────────────────
+        float glow = exp(-accum * 0.3) * 0.2;
+        col += glow * vec3(0.8, 0.2, 0.8);
+        
+        // ─── SCANLINE TORTURE ──────────────────────────────
+        float scanline = sin(uv.y * 1200.0 + t * 200.0) * 0.03;
         col += scanline;
-        col = pow(col, vec3(0.8 + 0.3 * sin(u_time * 0.1)));
+        
+        // ─── VHS CHAOS ────────────────────────────────────
+        float vhs = sin(uv.x * 800.0 + t * 150.0) * 0.02;
+        col += vhs;
+        
+        // ─── RGB SPLIT ──────────────────────────────────────
+        float split = sin(uv.y * 5.0 + t * 2.0) * 0.02;
+        col.r += split;
+        col.b -= split;
+        
+        // ─── POST-PROCESSING ──────────────────────────────
+        col = pow(col, vec3(0.8 + 0.3 * sin(t * 0.1)));
+        col = col / (col + 0.8);
+        col = clamp(col, 0.0, 1.0);
 
         fragColor = vec4(col, 1.0);
       }`;
@@ -426,51 +327,73 @@ function createWebGLContext() {
       precision highp float;
       uniform vec2 u_resolution;
       uniform float u_time;
+      uniform int u_pass;
 
-      float trigHell(vec3 p) {
+      float poisonMushroom(vec3 p, float t) {
         float v = 0.0;
         float amp = 1.0;
         for (int i = 0; i < ${currentLoops}; i++) {
           float fi = float(i);
-          v += amp * sin(p.x * 13.7 + u_time * 2.4 + fi * 0.01);
-          v += amp * cos(p.y * 16.9 + u_time * 2.8 + fi * 0.01);
-          v += amp * sin(p.z * 10.3 + u_time * 1.6 + fi * 0.01) * cos(p.z * 5.3 + u_time * 1.2);
+          v += amp * sin(p.x * 13.7 + t * 2.4 + fi * 0.01);
+          v += amp * cos(p.y * 16.9 + t * 2.8 + fi * 0.01);
+          v += amp * sin(p.z * 10.3 + t * 1.6 + fi * 0.01) * cos(p.z * 5.3 + t * 1.2);
           v = v * 0.5 + 0.5;
           amp *= 0.39;
-          p += vec3(sin(u_time * 0.9 + fi * 0.001), cos(u_time * 1.3 + fi * 0.001), sin(u_time * 0.7 + fi * 0.001));
+          p += vec3(sin(t * 0.9 + fi * 0.001), cos(t * 1.3 + fi * 0.001), sin(t * 0.7 + fi * 0.001));
           p = p * 1.001 + 0.001;
+          if (${CONFIG.escalationLevel} > 5) {
+            p = abs(p) - 0.5;
+          }
         }
         return v;
       }
 
       void main() {
         vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
-        vec3 ro = vec3(sin(u_time * 0.8) * 5.0, cos(u_time * 1.0) * 4.0, -10.0);
-        vec3 rd = normalize(vec3(uv * 2.2, 1.9 + sin(u_time * 0.5) * 0.5));
+        float t = u_time * 0.5 + float(u_pass) * 0.05;
+        
+        vec3 ro = vec3(
+          sin(t * 0.3) * 6.0,
+          cos(t * 0.4) * 4.0 + 2.0,
+          -8.0 + sin(t * 0.2) * 3.0
+        );
+        vec3 rd = normalize(vec3(uv * 2.2, 1.9 + sin(t * 0.5) * 0.5));
 
         float dist = 0.0;
         float accum = 0.0;
 
         for (int i = 0; i < ${currentSteps}; i++) {
           vec3 p = ro + rd * dist;
-          float density = abs(trigHell(p * 3.8 + u_time * 1.6)) * 0.12;
+          float density = abs(poisonMushroom(p * 3.8 + t * 1.6, t)) * 0.12;
           accum += density * exp(-dist * 0.018);
-          accum += sin(dist * 22.0 + u_time * 7.0) * cos(dist * 15.0) * 0.035;
-          accum += cos(dist * 33.0 + u_time * 9.0) * sin(dist * 27.0) * 0.025;
+          accum += sin(dist * 22.0 + t * 7.0) * cos(dist * 15.0) * 0.035;
+          accum += cos(dist * 33.0 + t * 9.0) * sin(dist * 27.0) * 0.025;
           dist += max(0.02, density * 0.38);
           if (dist > 100.0 || accum > 15.0) break;
         }
 
         vec3 col = 0.5 + 0.5 * vec3(
-          sin(accum * 5.1 + u_time * 2.4 + accum * 2.0),
-          cos(accum * 6.8 + u_time * 2.1 + accum * 1.5),
-          sin(accum * 4.7 + u_time * 1.2 + accum * 3.0)
+          sin(accum * 5.1 + t * 2.4 + accum * 2.0),
+          cos(accum * 6.8 + t * 2.1 + accum * 1.5),
+          sin(accum * 4.7 + t * 1.2 + accum * 3.0)
         );
         
-        col += vec3(sin(accum * 50.0 + u_time * 30.0) * 0.05);
-        float scanline = sin(uv.y * 1200.0 + u_time * 200.0) * 0.03;
+        float glow = exp(-accum * 0.3) * 0.2;
+        col += glow * vec3(0.8, 0.2, 0.8);
+        
+        float scanline = sin(uv.y * 1200.0 + t * 200.0) * 0.03;
         col += scanline;
-        col = pow(col, vec3(0.8 + 0.3 * sin(u_time * 0.1)));
+        
+        float vhs = sin(uv.x * 800.0 + t * 150.0) * 0.02;
+        col += vhs;
+        
+        float split = sin(uv.y * 5.0 + t * 2.0) * 0.02;
+        col.r += split;
+        col.b -= split;
+        
+        col = pow(col, vec3(0.8 + 0.3 * sin(t * 0.1)));
+        col = col / (col + 0.8);
+        col = clamp(col, 0.0, 1.0);
 
         gl_FragColor = vec4(col, 1.0);
       }`;
@@ -538,13 +461,16 @@ function render(now) {
   const elapsed = (now - startTime) / 1000;
   const heat = Math.min(100, (elapsed / 5) * 50 + 20 + Math.random() * 10);
 
+  // ─── RENDER PASSES ──────────────────────────────────
   for (let pass = 0; pass < CONFIG.renderPasses; pass++) {
     gl.viewport(0, 0, canvas.width, canvas.height);
     const resLoc = gl.getUniformLocation(program, 'u_resolution');
     const timeLoc = gl.getUniformLocation(program, 'u_time');
+    const passLoc = gl.getUniformLocation(program, 'u_pass');
     
     if (resLoc) gl.uniform2f(resLoc, canvas.width, canvas.height);
     if (timeLoc) gl.uniform1f(timeLoc, elapsed + pass * 0.05);
+    if (passLoc) gl.uniform1i(passLoc, pass);
     
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
@@ -670,9 +596,6 @@ function startNuke() {
     return;
   }
 
-  // ─── START VISUAL CHAOS ──────────────────────────────────
-  startVisualChaos();
-
   // ─── START GLITCHES ──────────────────────────────────────
   if (window.glitchSystem) {
     setTimeout(() => {
@@ -765,10 +688,6 @@ document.addEventListener('DOMContentLoaded', function() {
       canvas.width = window.innerWidth * scale;
       canvas.height = window.innerHeight * scale;
       gl.viewport(0, 0, canvas.width, canvas.height);
-    }
-    if (visualCanvas) {
-      visualCanvas.width = window.innerWidth;
-      visualCanvas.height = window.innerHeight;
     }
   });
 
