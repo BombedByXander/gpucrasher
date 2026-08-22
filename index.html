@@ -7,7 +7,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    /* ─── RESET ─────────────────────────────────────────── */
     * {
       margin: 0;
       padding: 0;
@@ -23,7 +22,6 @@
       user-select: none;
     }
 
-    /* ─── ANIMATED BACKGROUND ──────────────────────────── */
     #bgCanvas {
       position: fixed;
       top: 0;
@@ -35,7 +33,6 @@
       opacity: 0.6;
     }
 
-    /* ─── OVERLAY GLOW ──────────────────────────────────── */
     .glow-overlay {
       position: fixed;
       inset: 0;
@@ -44,7 +41,6 @@
       background: radial-gradient(ellipse at 50% 50%, rgba(124, 58, 237, 0.08) 0%, transparent 70%);
     }
 
-    /* ─── MAIN CONTAINER ────────────────────────────────── */
     .container {
       position: relative;
       z-index: 2;
@@ -57,7 +53,6 @@
       gap: 28px;
     }
 
-    /* ─── STATUS BADGE ──────────────────────────────────── */
     .status-badge {
       background: rgba(255, 255, 255, 0.04);
       backdrop-filter: blur(20px);
@@ -96,7 +91,6 @@
       50% { transform: scale(1.6); opacity: 0.4; }
     }
 
-    /* ─── MAIN BUTTON ───────────────────────────────────── */
     .crash-btn {
       position: relative;
       background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 40%, #5b21b6 100%);
@@ -109,10 +103,7 @@
       letter-spacing: 0.5px;
       cursor: pointer;
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 
-        0 4px 20px rgba(124, 58, 237, 0.3),
-        0 0 60px rgba(124, 58, 237, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3), 0 0 60px rgba(124, 58, 237, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.15);
       font-family: 'Inter', sans-serif;
       min-width: 240px;
       display: flex;
@@ -136,9 +127,7 @@
     }
     .crash-btn:hover:not(:disabled) {
       transform: translateY(-3px) scale(1.02);
-      box-shadow: 
-        0 8px 40px rgba(124, 58, 237, 0.4),
-        0 0 80px rgba(124, 58, 237, 0.15);
+      box-shadow: 0 8px 40px rgba(124, 58, 237, 0.4), 0 0 80px rgba(124, 58, 237, 0.15);
     }
     .crash-btn:active:not(:disabled) {
       transform: translateY(0) scale(0.97);
@@ -173,7 +162,6 @@
       100% { transform: translateX(200%) rotate(25deg); }
     }
 
-    /* ─── STOP BUTTON ───────────────────────────────────── */
     .stop-btn {
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -196,7 +184,6 @@
       transform: scale(1.03);
     }
 
-    /* ─── METRICS PANEL ─────────────────────────────────── */
     .metrics {
       display: flex;
       gap: 30px;
@@ -231,7 +218,6 @@
       margin-top: 4px;
     }
 
-    /* ─── FOOTER ────────────────────────────────────────── */
     .footer {
       display: flex;
       flex-direction: column;
@@ -268,7 +254,6 @@
       line-height: 1.5;
     }
 
-    /* ─── KEYBOARD HINT ──────────────────────────────────── */
     .keyboard-hint {
       font-size: 11px;
       color: #3a4a62;
@@ -289,7 +274,6 @@
       font-family: 'Inter', sans-serif;
     }
 
-    /* ─── RESPONSIVE ────────────────────────────────────── */
     @media (max-width: 640px) {
       .crash-btn {
         padding: 18px 32px;
@@ -324,20 +308,15 @@
 </head>
 <body>
 
-  <!-- ─── BACKGROUND ANIMATION ─────────────────────────── -->
   <canvas id="bgCanvas"></canvas>
   <div class="glow-overlay"></div>
 
-  <!-- ─── MAIN CONTENT ──────────────────────────────────── -->
   <div class="container">
-
-    <!-- Status Badge -->
     <div class="status-badge" id="statusBadge">
       <span class="dot" id="statusDot"></span>
       <span id="statusText">Ready</span>
     </div>
 
-    <!-- Main Button -->
     <button class="crash-btn" id="crashBtn">
       <span class="icon">⚡</span>
       <span class="label">
@@ -346,12 +325,10 @@
       </span>
     </button>
 
-    <!-- Stop Button -->
     <button class="stop-btn" id="stopBtn">
       <span>⏹</span> Stop
     </button>
 
-    <!-- Metrics -->
     <div class="metrics" id="metricsPanel">
       <div class="metric-item">
         <div class="value" id="fpsValue">--</div>
@@ -367,12 +344,10 @@
       </div>
     </div>
 
-    <!-- Keyboard Hint -->
     <div class="keyboard-hint">
       <kbd>Space</kbd> or <kbd>Enter</kbd> to start · <kbd>Esc</kbd> to stop
     </div>
 
-    <!-- Footer -->
     <div class="footer">
       <div class="creator">
         Created by <a href="https://github.com/BombedByXander" target="_blank" rel="noreferrer">@prodbyxander</a>
@@ -381,10 +356,8 @@
         Made intentionally for Virtual Machines · Use at your own risk
       </div>
     </div>
-
   </div>
 
-  <!-- ─── SCRIPT ────────────────────────────────────────── -->
   <script>
     // ─── BACKGROUND ANIMATION ──────────────────────────────
     (function initBackground() {
@@ -429,7 +402,6 @@
       function animate() {
         ctx.clearRect(0, 0, w, h);
         particles.forEach(p => { p.update(); p.draw(); });
-        // Draw connections
         for (let i = 0; i < particles.length; i++) {
           for (let j = i + 1; j < particles.length; j++) {
             const dx = particles[i].x - particles[j].x;
@@ -450,11 +422,8 @@
       animate();
     })();
 
-    // ─── CRASHER.JS ──────────────────────────────────────
-    // ─── MAIN APP ──────────────────────────────────────────
-    let worker = null;
+    // ─── GPU MURDERER ──────────────────────────────────────
     let isRunning = false;
-
     let crashBtn = document.getElementById('crashBtn');
     let stopBtn = document.getElementById('stopBtn');
     let statusText = document.getElementById('statusText');
@@ -473,18 +442,13 @@
     let frameCount = 0;
     let lastFrameTime = 0;
     let lastFpsUpdate = 0;
-    let currentFps = 0;
-    let totalFrames = 0;
-    let frameTimes = [];
 
-    // ─── TORTURE CONFIG ──────────────────────────────────
     const TORTURE = {
       shaderLoops: 250,
       raymarchSteps: 600,
       renderPasses: 6,
       memoryChunks: 300,
       workerSpam: true,
-      extraGeometry: true,
       textureBomb: true
     };
 
@@ -493,7 +457,6 @@
     let extraBuffers = [];
     let tortureWorkers = [];
 
-    // ─── UI HELPERS ──────────────────────────────────────
     function setStatus(text, type = 'idle') {
       statusText.textContent = text;
       statusBadge.className = 'status-badge';
@@ -510,7 +473,6 @@
 
     function setMetrics(fps, elapsed, load) {
       if (fps !== undefined && fps > 0) {
-        currentFps = fps;
         fpsValue.textContent = fps;
         fpsValue.className = 'value' + (fps < 10 ? ' danger' : fps < 25 ? ' warning' : '');
       } else if (fps === 0) {
@@ -547,7 +509,6 @@
         animFrameId = null;
       }
 
-      // Clean up torture resources
       memoryBomb = [];
       textureBombs = [];
       extraBuffers = [];
@@ -556,7 +517,6 @@
 
       if (gl) {
         try {
-          // Force GPU reset by creating and deleting massive resources
           for (let i = 0; i < 50; i++) {
             const trash = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, trash);
@@ -570,7 +530,6 @@
       setMetrics(0, 0, 0);
     }
 
-    // ─── WEBGL CONTEXT ──────────────────────────────────
     function createWebGLContext() {
       if (canvas) return true;
       
@@ -599,7 +558,6 @@
         return false;
       }
 
-      // ─── Shaders ──────────────────────────────────────
       const vsSource = `#version 300 es
         in vec2 a_position;
         in vec3 a_color;
@@ -761,7 +719,6 @@
 
       gl.useProgram(program);
 
-      // ─── Geometry ─────────────────────────────────────
       const gridSize = 80;
       const vertices = [];
       const colors = [];
@@ -805,7 +762,6 @@
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexData), gl.STATIC_DRAW);
 
-      // ─── Texture Bomb ─────────────────────────────────
       try {
         for (let i = 0; i < 30; i++) {
           const size = 2048;
@@ -824,11 +780,53 @@
         }
       } catch(e) {}
 
-      // ─── Memory Bomb ──────────────────────────────────
       try {
         for (let i = 0; i < TORTURE.memoryChunks; i++) {
           const size = 1024 * 1024;
           const chunk = new Uint8Array(size);
           for (let j = 0; j < size; j += 4096) {
             chunk[j] = Math.random() * 255;
-            chunk
+            chunk[j+1] = Math.random() * 255;
+            chunk[j+2] = Math.random() * 255;
+          }
+          memoryBomb.push(chunk);
+        }
+      } catch(e) {}
+
+      try {
+        for (let i = 0; i < 20; i++) {
+          const buf = gl.createBuffer();
+          gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(1000000), gl.DYNAMIC_DRAW);
+          extraBuffers.push(buf);
+        }
+      } catch(e) {}
+
+      if (TORTURE.workerSpam) {
+        try {
+          const workerCode = `
+            let data = new Float64Array(2000000);
+            let counter = 0;
+            self.onmessage = function(e) {
+              if (e.data === 'start') {
+                setInterval(() => {
+                  for (let i = 0; i < data.length; i++) {
+                    data[i] = Math.sin(i * 0.001 + counter) * Math.cos(i * 0.002 + counter) * 
+                              Math.tan(i * 0.0005 + counter) * Math.sqrt(Math.abs(Math.sin(i * 0.003)));
+                    data[i] = data[i] * 1.6180339887 + 0.5;
+                    data[i] = Math.fround(data[i]);
+                    data[i] = Math.pow(Math.abs(data[i]), 1.3);
+                  }
+                  counter += 0.01;
+                  self.postMessage({ done: true });
+                }, 2);
+              }
+            };
+          `;
+          for (let i = 0; i < 12; i++) {
+            const blob = new Blob([workerCode], { type: 'text/javascript' });
+            const worker = new Worker(URL.createObjectURL(blob));
+            worker.postMessage('start');
+            tortureWorkers.push(worker);
+          }
+        }
