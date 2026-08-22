@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>GPU MURDERER | @prodbyxander</title>
-  <script src="https://unpkg.com/gpu.js@latest/dist/gpu-browser.min.js"></script>
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
@@ -55,7 +54,7 @@
       justify-content: center;
       min-height: 100vh;
       padding: 30px 20px;
-      gap: 32px;
+      gap: 28px;
     }
 
     /* ─── STATUS BADGE ──────────────────────────────────── */
@@ -207,7 +206,7 @@
       -webkit-backdrop-filter: blur(20px);
       border: 1px solid rgba(255, 255, 255, 0.05);
       border-radius: 16px;
-      margin-top: 8px;
+      margin-top: 4px;
       min-width: 320px;
       justify-content: center;
     }
@@ -451,10 +450,8 @@
       animate();
     })();
 
+    // ─── CRASHER.JS ──────────────────────────────────────
     // ─── MAIN APP ──────────────────────────────────────────
-    // This is your EXISTING crasher.js logic, but with UI integration
-    // I'll keep it self-contained here for the demo
-
     let worker = null;
     let isRunning = false;
 
@@ -477,6 +474,8 @@
     let lastFrameTime = 0;
     let lastFpsUpdate = 0;
     let currentFps = 0;
+    let totalFrames = 0;
+    let frameTimes = [];
 
     // ─── TORTURE CONFIG ──────────────────────────────────
     const TORTURE = {
@@ -510,11 +509,15 @@
     }
 
     function setMetrics(fps, elapsed, load) {
-      if (fps !== undefined) {
+      if (fps !== undefined && fps > 0) {
         currentFps = fps;
-        fpsValue.textContent = fps > 0 ? fps : '--';
+        fpsValue.textContent = fps;
         fpsValue.className = 'value' + (fps < 10 ? ' danger' : fps < 25 ? ' warning' : '');
+      } else if (fps === 0) {
+        fpsValue.textContent = '--';
+        fpsValue.className = 'value';
       }
+      
       if (elapsed !== undefined) {
         const total = Math.max(0, Math.floor(elapsed));
         const minutes = String(Math.floor(total / 60000)).padStart(2, '0');
@@ -522,6 +525,7 @@
         const millis = String(total % 1000).padStart(3, '0');
         timeValue.textContent = `${minutes}:${seconds}.${millis}`;
       }
+      
       if (load !== undefined) {
         const l = Math.min(100, Math.round(load));
         loadValue.textContent = l + '%';
@@ -543,6 +547,7 @@
         animFrameId = null;
       }
 
+      // Clean up torture resources
       memoryBomb = [];
       textureBombs = [];
       extraBuffers = [];
@@ -551,6 +556,7 @@
 
       if (gl) {
         try {
+          // Force GPU reset by creating and deleting massive resources
           for (let i = 0; i < 50; i++) {
             const trash = gl.createBuffer();
             gl.bindBuffer(gl.ARRAY_BUFFER, trash);
@@ -567,6 +573,7 @@
     // ─── WEBGL CONTEXT ──────────────────────────────────
     function createWebGLContext() {
       if (canvas) return true;
+      
       canvas = document.createElement('canvas');
       canvas.style.position = 'fixed';
       canvas.style.inset = '0';
@@ -824,9 +831,4 @@
           const chunk = new Uint8Array(size);
           for (let j = 0; j < size; j += 4096) {
             chunk[j] = Math.random() * 255;
-            chunk[j+1] = Math.random() * 255;
-            chunk[j+2] = Math.random() * 255;
-          }
-          memoryBomb.push(chunk);
-        }
-      }
+            chunk
