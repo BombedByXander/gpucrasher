@@ -385,6 +385,31 @@
       border: 1px solid rgba(255, 255, 255, 0.06);
       font-family: 'Inter', sans-serif;
     }
+    /* ─── PIP BUTTON ────────────────────────────────────── */
+    .pip-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #8b9bb5;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: 'Inter', sans-serif;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: blur(10px);
+      margin-top: -4px;
+    }
+    .pip-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    .pip-btn.show {
+      display: flex;
+    }
     @media (max-width: 640px) {
       .crash-btn {
         padding: 18px 36px;
@@ -456,6 +481,10 @@
       <span>⏹</span> Stop Torture
     </button>
 
+    <button class="pip-btn" id="pipBtn">
+      <span>📺</span> Picture-in-Picture
+    </button>
+
     <div class="metrics" id="metricsPanel">
       <div class="metric-item">
         <div class="value" id="fpsValue">--</div>
@@ -488,12 +517,10 @@
       </div>
     </div>
   </div>
-<!-- Add these somewhere in your HTML -->
-<div id="status"></div>
-<div id="time"></div>
 
   <script src="crasher.js"></script>
   <script>
+    // ─── BACKGROUND ANIMATION ──────────────────────────────
     (function initBackground() {
       const canvas = document.getElementById('bgCanvas');
       if (!canvas) return;
@@ -556,6 +583,59 @@
       }
       animate();
     })();
+
+    // ─── PICTURE-IN-PICTURE SUPPORT ────────────────────────
+    document.addEventListener('DOMContentLoaded', function() {
+      const pipBtn = document.getElementById('pipBtn');
+      
+      // Show PiP button if supported
+      if (document.pictureInPictureEnabled) {
+        pipBtn.classList.add('show');
+      }
+
+      pipBtn.addEventListener('click', async function() {
+        try {
+          // Find the video element or create one for PiP
+          let video = document.getElementById('pipVideo');
+          if (!video) {
+            video = document.createElement('video');
+            video.id = 'pipVideo';
+            video.style.display = 'none';
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            
+            // Create a canvas stream for PiP
+            const canvas = document.querySelector('canvas:not(#bgCanvas)');
+            if (canvas) {
+              const stream = canvas.captureStream(30);
+              video.srcObject = stream;
+            } else {
+              // Fallback: create a dummy canvas
+              const dummyCanvas = document.createElement('canvas');
+              dummyCanvas.width = 320;
+              dummyCanvas.height = 180;
+              const ctx = dummyCanvas.getContext('2d');
+              ctx.fillStyle = '#7c3aed';
+              ctx.fillRect(0, 0, 320, 180);
+              ctx.fillStyle = 'white';
+              ctx.font = '20px Arial';
+              ctx.textAlign = 'center';
+              ctx.fillText('GPU CRASHER', 160, 90);
+              ctx.fillText('🔥 Running...', 160, 130);
+              const stream = dummyCanvas.captureStream(30);
+              video.srcObject = stream;
+            }
+            
+            document.body.appendChild(video);
+            await video.play();
+          }
+          
+          await video.requestPictureInPicture();
+        } catch (err) {
+          console.log('PiP error:', err);
+        }
+      });
+    });
   </script>
 </body>
 </html>
