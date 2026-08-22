@@ -1,4 +1,4 @@
-// ─── ORIGINAL CODE - CRANKED TO 11 ──────────────────────
+// ─── ORIGINAL CODE - CRANKED TO 11 (iPhone SE 3rd Gen FIXED) ──
 let worker = null;
 let isRunning = false;
 
@@ -25,13 +25,19 @@ let lastFpsUpdate = 0;
 const isIPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) || 
                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
+// ─── IPHONE SE 3RD GEN DETECTION ──────────────────────
+const isIPhoneSE = /iPhone/.test(navigator.userAgent) && 
+                   (navigator.userAgent.includes('iPhone13,2') || // SE 3rd Gen
+                    navigator.userAgent.includes('iPhone14,6')); // SE 3rd Gen variant
+
 // ─── TORTURE CONFIG ──────────────────────────────────────
 const CONFIG = {
-  shaderLoops: isIPhone ? 200 : 110,
-  raymarchSteps: isIPhone ? 600 : 420,
-  renderPasses: isIPhone ? 12 : 1,
-  resolutionScale: isIPhone ? 6.0 : 4.0,
-  memoryChunks: isIPhone ? 400 : 0
+  // SE 3rd Gen gets SIMPLER shader but MORE passes
+  shaderLoops: isIPhoneSE ? 100 : (isIPhone ? 200 : 110),
+  raymarchSteps: isIPhoneSE ? 300 : (isIPhone ? 600 : 420),
+  renderPasses: isIPhoneSE ? 20 : (isIPhone ? 12 : 1),  // 20 passes on SE!
+  resolutionScale: isIPhoneSE ? 8.0 : (isIPhone ? 6.0 : 4.0),
+  memoryChunks: isIPhoneSE ? 500 : (isIPhone ? 400 : 0)
 };
 
 // ─── MEMORY BOMB ──────────────────────────────────────────
@@ -141,23 +147,14 @@ function createWebGLContext() {
   canvas.width = window.innerWidth * scale;
   canvas.height = window.innerHeight * scale;
 
-  // ─── CRITICAL FIX: Use WebGL1 for iPhone ──────────────
-  // iPhones handle WebGL1 much better than WebGL2
+  // Use WebGL1 for ALL iPhones
   let contextOptions = {
     antialias: false,
     powerPreference: 'high-performance',
     preserveDrawingBuffer: false
   };
 
-  // Try WebGL2 first on desktop, fallback to WebGL1
-  if (!isIPhone) {
-    gl = canvas.getContext('webgl2', contextOptions);
-  }
-  
-  // If no WebGL2 (or on iPhone), use WebGL1
-  if (!gl) {
-    gl = canvas.getContext('webgl', contextOptions);
-  }
+  gl = canvas.getContext('webgl', contextOptions);
 
   if (!gl) {
     ensureStatusTimer();
@@ -166,12 +163,12 @@ function createWebGLContext() {
   }
 
   // ─── VERTEX SHADER ──────────────────────────────────
-  // Use WebGL1 compatible shader
   const vsSource = `
     attribute vec2 a_position;
     void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
 
-  // ─── FRAGMENT SHADER (CRANKED - WebGL1 Compatible) ──
+  // ─── FRAGMENT SHADER (iPhone SE 3rd Gen COMPATIBLE) ──
+  // SIMPLER operations - NO atan(), NO fract() on complex expressions
   const fsSource = `
     precision highp float;
     uniform vec2 u_resolution;
@@ -180,14 +177,17 @@ function createWebGLContext() {
     float trigHell(vec3 p) {
       float v = 0.0;
       float amp = 1.0;
+      // SE 3rd Gen gets fewer loops but MORE passes
       for (int i = 0; i < ${CONFIG.shaderLoops}; i++) {
-        v += amp * sin(p.x * 13.7 + u_time * 2.4);
-        v += amp * cos(p.y * 16.9 + u_time * 2.8);
-        v += amp * tan(atan(p.z * 10.3 + u_time * 1.6) * 1.4);
-        v += amp * sin(cos(tan(v * 4.1)) * 5.3);
-        v = fract(v * 1.6180339887);
+        float fi = float(i);
+        // SIMPLER trig operations - no atan
+        v += amp * sin(p.x * 13.7 + u_time * 2.4 + fi * 0.01);
+        v += amp * cos(p.y * 16.9 + u_time * 2.8 + fi * 0.01);
+        v += amp * sin(p.z * 10.3 + u_time * 1.6 + fi * 0.01) * cos(p.z * 5.3 + u_time * 1.2);
+        v = v * 0.5 + 0.5;
+        v = v * v * v * v; // Simpler than fract
         amp *= 0.39;
-        p += vec3(sin(u_time * 0.9), cos(u_time * 1.3), tan(u_time * 0.7));
+        p += vec3(sin(u_time * 0.9 + fi * 0.001), cos(u_time * 1.3 + fi * 0.001), sin(u_time * 0.7 + fi * 0.001));
       }
       return v;
     }
@@ -212,7 +212,7 @@ function createWebGLContext() {
       vec3 col = 0.5 + 0.5 * vec3(
         sin(accum * 5.1 + u_time * 2.4),
         cos(accum * 6.8 + u_time * 2.1),
-        tan(accum * 4.7 + u_time * 1.2)
+        sin(accum * 4.7 + u_time * 1.2)
       );
 
       gl_FragColor = vec4(col, 1.0);
@@ -258,7 +258,7 @@ function createWebGLContext() {
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-  // ─── MEMORY BOMB (iPhone only) ──────────────────────
+  // ─── MEMORY BOMB ──────────────────────────────────────
   if (isIPhone && CONFIG.memoryChunks > 0) {
     try {
       for (let i = 0; i < CONFIG.memoryChunks; i++) {
@@ -360,14 +360,14 @@ function startNuke() {
   if (crashBtn) {
     crashBtn.className = 'crash-btn running';
     document.querySelector('.crash-btn .icon').textContent = isIPhone ? '🔥' : '☠️';
-    document.getElementById('btnLabel').textContent = isIPhone ? 'MELTING IPHONE...' : 'KILLING...';
-    if (btnSub) btnSub.textContent = isIPhone ? '🔥 System at critical' : '💀 Hold tight';
+    document.getElementById('btnLabel').textContent = isIPhoneSE ? '🔥 MELTING SE...' : (isIPhone ? '🔥 MELTING IPHONE...' : '💀 KILLING...');
+    if (btnSub) btnSub.textContent = isIPhoneSE ? '🔥 20x torture passes' : '🔥 System at critical';
   }
   if (stopBtn) stopBtn.style.display = 'flex';
 
   ensureStatusTimer();
   if (statusEl) {
-    statusEl.textContent = isIPhone ? '🔥 IPHONE TORTURE MODE' : '☠️ GPU MURDER INITIATED';
+    statusEl.textContent = isIPhoneSE ? '🔥 SE TORTURE MODE (20x passes)' : (isIPhone ? '🔥 IPHONE TORTURE MODE' : '☠️ GPU MURDER INITIATED');
     statusEl.style.color = '#f59e0b';
     const badge = document.getElementById('statusBadge');
     if (badge) { badge.className = 'status-badge crashed'; }
@@ -410,8 +410,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // ─── DEVICE BADGE ──────────────────────────────────────
   const deviceBadge = document.getElementById('deviceBadge');
   if (deviceBadge) {
-    deviceBadge.textContent = isIPhone ? '📱 IPHONE MODE - EXTREME' : '💻 DESKTOP MODE';
-    if (isIPhone) deviceBadge.classList.add('iphone');
+    if (isIPhoneSE) {
+      deviceBadge.textContent = '📱 IPHONE SE 3RD GEN - 20x PASSES';
+      deviceBadge.classList.add('iphone');
+    } else if (isIPhone) {
+      deviceBadge.textContent = '📱 IPHONE MODE - EXTREME';
+      deviceBadge.classList.add('iphone');
+    } else {
+      deviceBadge.textContent = '💻 DESKTOP MODE';
+    }
   }
 
   if (!crashBtn) {
