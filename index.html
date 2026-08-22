@@ -350,32 +350,30 @@
     // ─── DETECT IPHONE ──────────────────────────────────────
     const isIPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) || 
                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
     
-    document.getElementById('deviceBadge').textContent = isIPhone ? '📱 IPHONE MODE - EXTREME TORTURE' : 
-                                                         isMobile ? '📱 MOBILE MODE' : '💻 DESKTOP MODE';
+    document.getElementById('deviceBadge').textContent = isIPhone ? '📱 IPHONE MODE - EXTREME TORTURE' : '💻 DESKTOP MODE';
 
-    // ─── TORTURE CONFIG ──────────────────────────────────
-    const TORTURE = {
-      desktop: {
-        renderPasses: 6,
-        memoryChunks: 300,
-        resolutionScale: 6.0,
-        gridSize: 80,
-        workerCount: 12,
-        textureCount: 30
-      },
-      iphone: {
-        renderPasses: 30,        // 30x fill-rate torture
-        memoryChunks: 800,       // 800MB memory bomb
-        resolutionScale: 10.0,   // 10x resolution
-        gridSize: 150,           // 150x150 grid = 22,500 vertices
-        workerCount: 20,         // 20 Web Workers
-        textureCount: 50         // 50 textures
-      }
-    };
+    // ─── ORIGINAL WORKING APPROACH ──────────────────────
+    let worker = null;
+    let isRunning = false;
+    let crashBtn = document.getElementById('crashBtn');
+    let stopBtn = document.getElementById('stopBtn');
+    let statusText = document.getElementById('statusText');
+    let statusDot = document.getElementById('statusDot');
+    let statusBadge = document.getElementById('statusBadge');
+    let btnLabel = document.getElementById('btnLabel');
+    let fpsValue = document.getElementById('fpsValue');
+    let timeValue = document.getElementById('timeValue');
+    let loadValue = document.getElementById('loadValue');
 
-    const config = isIPhone ? TORTURE.iphone : TORTURE.desktop;
+    let gl = null;
+    let program = null;
+    let canvas = null;
+    let startTime = 0;
+    let animFrameId = null;
+    let frameCount = 0;
+    let lastFrameTime = 0;
+    let lastFpsUpdate = 0;
 
     // ─── BACKGROUND ANIMATION ──────────────────────────────
     (function initBackground() {
@@ -440,31 +438,7 @@
       animate();
     })();
 
-    // ─── GPU MURDERER ──────────────────────────────────────
-    let isRunning = false;
-    let crashBtn = document.getElementById('crashBtn');
-    let stopBtn = document.getElementById('stopBtn');
-    let statusText = document.getElementById('statusText');
-    let statusDot = document.getElementById('statusDot');
-    let statusBadge = document.getElementById('statusBadge');
-    let btnLabel = document.getElementById('btnLabel');
-    let fpsValue = document.getElementById('fpsValue');
-    let timeValue = document.getElementById('timeValue');
-    let loadValue = document.getElementById('loadValue');
-
-    let gl = null;
-    let program = null;
-    let canvas = null;
-    let startTime = 0;
-    let animFrameId = null;
-    let frameCount = 0;
-    let lastFpsUpdate = 0;
-
-    let memoryBomb = [];
-    let textureBombs = [];
-    let extraBuffers = [];
-    let tortureWorkers = [];
-
+    // ─── UI HELPERS ──────────────────────────────────────
     function setStatus(text, type = 'idle') {
       statusText.textContent = text;
       statusBadge.className = 'status-badge';
@@ -516,31 +490,14 @@
         cancelAnimationFrame(animFrameId);
         animFrameId = null;
       }
-
-      memoryBomb = [];
-      textureBombs = [];
-      extraBuffers = [];
-      tortureWorkers.forEach(w => { try { w.terminate(); } catch(e) {} });
-      tortureWorkers = [];
-
-      if (gl) {
-        try {
-          for (let i = 0; i < 50; i++) {
-            const trash = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, trash);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(1000000), gl.STATIC_DRAW);
-            gl.deleteBuffer(trash);
-          }
-        } catch(e) {}
-      }
-
       setStatus('Ready', 'idle');
       setMetrics(0, 0, 0);
     }
 
+    // ─── ORIGINAL WORKING WEBGL CONTEXT (BUT HARSHER) ────
     function createWebGLContext() {
       if (canvas) return true;
-      
+
       canvas = document.createElement('canvas');
       canvas.style.position = 'fixed';
       canvas.style.inset = '0';
@@ -549,7 +506,8 @@
       canvas.style.opacity = '0.7';
       document.body.prepend(canvas);
 
-      const scale = config.resolutionScale;
+      // EVEN HIGHER RESOLUTION for iPhone torture
+      const scale = isIPhone ? 8.0 : 6.0;
       canvas.width = window.innerWidth * scale;
       canvas.height = window.innerHeight * scale;
 
@@ -557,152 +515,92 @@
         antialias: false,
         powerPreference: 'high-performance',
         desynchronized: true,
-        preserveDrawingBuffer: false,
-        failIfMajorPerformanceCaveat: false
-      });
-
-      if (!gl) {
-        gl = canvas.getContext('webgl', {
-          antialias: false,
-          powerPreference: 'high-performance',
-          preserveDrawingBuffer: false
-        });
-      }
+        preserveDrawingBuffer: false
+      }) || canvas.getContext('webgl');
 
       if (!gl) {
         setStatus('No WebGL!', 'idle');
         return false;
       }
 
-      const isWebGL2 = gl.getParameter(gl.VERSION).includes('WebGL 2');
-
-      // ─── SUPER BRUTAL SHADER (Works on everything) ──────
-      const vsSource = isWebGL2 ? 
-        `#version 300 es
+      // ─── ORIGINAL VERTEX SHADER ──────────────────────
+      const vsSource = `#version 300 es
         in vec2 a_position;
-        in vec3 a_color;
-        out vec3 v_color;
-        uniform float u_time;
-        void main() {
-          vec2 pos = a_position;
-          float wave = sin(pos.x * 50.0 + u_time * 8.0) * 0.2;
-          wave += cos(pos.y * 45.0 + u_time * 7.0) * 0.2;
-          wave += sin((pos.x + pos.y) * 60.0 + u_time * 10.0) * 0.15;
-          pos += wave;
-          gl_Position = vec4(pos, 0.0, 1.0);
-          v_color = a_color + vec3(sin(u_time + pos.x * 80.0), cos(u_time + pos.y * 80.0), 0.0) * 0.5;
-        }` :
-        `
-        attribute vec2 a_position;
-        attribute vec3 a_color;
-        varying vec3 v_color;
-        uniform float u_time;
-        void main() {
-          vec2 pos = a_position;
-          float wave = sin(pos.x * 50.0 + u_time * 8.0) * 0.2;
-          wave += cos(pos.y * 45.0 + u_time * 7.0) * 0.2;
-          pos += wave;
-          gl_Position = vec4(pos, 0.0, 1.0);
-          v_color = a_color + vec3(sin(u_time + pos.x * 80.0), cos(u_time + pos.y * 80.0), 0.0) * 0.5;
-        }`;
+        void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
 
-      const fsSource = isWebGL2 ?
-        `#version 300 es
+      // ─── ORIGINAL FRAGMENT SHADER (BUT HARSHER) ──────
+      let fsSource = `#version 300 es
         precision highp float;
         out vec4 fragColor;
         uniform vec2 u_resolution;
         uniform float u_time;
-        uniform int u_pass;
+
+        float trigHell(vec3 p, float t) {
+          float v = 0.0;
+          float amp = 1.0;
+          // INCREASED from 110 to 350 for more torture
+          for (int i = 0; i < 350; i++) {
+            float fi = float(i);
+            v += amp * sin(p.x * 13.7 + t * 2.4 + fi * 0.1);
+            v += amp * cos(p.y * 16.9 + t * 2.8 + fi * 0.13);
+            v += amp * tan(atan(p.z * 10.3 + t * 1.6 + fi * 0.07) * 1.4);
+            v += amp * sin(cos(tan(v * 4.1 + fi * 0.05)) * 5.3);
+            v += amp * cos(sin(v * 3.7 + fi * 0.03) * 4.9);
+            v += amp * atan(sin(v * 6.3 + t * 2.1) * 1.7);
+            v = fract(v * 1.6180339887);
+            amp *= 0.37;
+            p += vec3(sin(t * 0.9 + fi * 0.02), cos(t * 1.3 + fi * 0.025), tan(t * 0.7 + fi * 0.015));
+            p = abs(p) - 0.5;
+            p = vec3(sin(p.x + t), cos(p.y + t), tan(p.z + t));
+          }
+          return v;
+        }
 
         void main() {
-          vec2 uv = gl_FragCoord.xy / u_resolution;
-          float t = u_time + float(u_pass) * 0.5;
-          
-          // EXTREME LOOP TORTURE - 500 iterations
-          float v = 0.0;
-          for (int i = 0; i < 500; i++) {
-            float fi = float(i);
-            vec2 uv2 = uv + vec2(sin(t + fi * 0.1) * 0.01, cos(t + fi * 0.1) * 0.01);
-            v += sin(uv2.x * 100.0 + t * 10.0 + fi) * cos(uv2.y * 100.0 + t * 8.0 + fi * 0.7);
-            v += cos(uv2.x * 80.0 + t * 7.0 + fi * 0.5) * sin(uv2.y * 120.0 + t * 9.0 + fi * 0.3);
-            v += tan(sin(uv2.x * 60.0 + t * 5.0 + fi * 0.2) * cos(uv2.y * 60.0 + t * 6.0 + fi * 0.4));
-            v = fract(v * 1.6180339887);
-            v = pow(abs(v), 1.3);
+          vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
+          vec3 ro = vec3(sin(u_time * 0.8) * 5.0, cos(u_time * 1.0) * 4.0, -10.0);
+          vec3 rd = normalize(vec3(uv * 2.2, 1.9 + sin(u_time * 0.5) * 0.5));
+
+          float dist = 0.0;
+          float accum = 0.0;
+          // INCREASED from 420 to 700 steps
+          for (int i = 0; i < 700; i++) {
+            vec3 p = ro + rd * dist;
+            float density = abs(trigHell(p * 3.8 + u_time * 1.6, u_time)) * 0.12;
+            accum += density * exp(-dist * 0.018);
+            accum += sin(dist * 22.0 + u_time * 7.0) * cos(dist * 15.0) * 0.035;
+            accum += cos(dist * 33.0 + u_time * 9.0) * sin(dist * 27.0) * 0.025;
+            dist += max(0.02, density * 0.38);
+            if (dist > 100.0 || accum > 15.0) break;
           }
+
+          vec3 col = 0.5 + 0.5 * vec3(
+            sin(accum * 5.1 + u_time * 2.4),
+            cos(accum * 6.8 + u_time * 2.1),
+            tan(accum * 4.7 + u_time * 1.2)
+          );
           
-          // More torture - multiple color transformations
-          vec3 col = vec3(0.0);
-          for (int j = 0; j < 10; j++) {
-            float fj = float(j);
-            vec2 uv3 = uv + vec2(sin(t * 2.0 + fj), cos(t * 2.0 + fj)) * 0.005;
-            float val = sin(uv3.x * 200.0 + t * 20.0 + fj) * cos(uv3.y * 200.0 + t * 15.0 + fj);
-            col += vec3(val * 0.1, val * 0.05, val * 0.08);
-          }
-          
-          col += v_color * (0.3 + 0.7 * sin(v * 20.0 + t));
-          col += vec3(sin(uv.x * 500.0 + t * 50.0) * 0.05);
-          
-          // Bloom torture
-          float bloom = exp(-length(uv - 0.5) * 5.0) * 0.3;
-          col += bloom;
-          
-          // Extreme color grading
-          col = pow(col, vec3(0.7 + 0.3 * sin(t * 0.5)));
-          col = col / (col + 0.5);
-          col = clamp(col, 0.0, 1.0);
+          // Extra color torture
+          col += vec3(sin(accum * 50.0 + u_time * 30.0) * 0.05);
+          float scanline = sin(uv.y * 1200.0 + u_time * 200.0) * 0.03;
+          col += scanline;
+          col = pow(col, vec3(0.8 + 0.3 * sin(u_time * 0.1)));
           
           fragColor = vec4(col, 1.0);
-        }` :
-        // WebGL1 version (also 500 loops but with varying)
-        `
-        precision highp float;
-        varying vec3 v_color;
-        uniform vec2 u_resolution;
-        uniform float u_time;
-        uniform int u_pass;
-
-        void main() {
-          vec2 uv = gl_FragCoord.xy / u_resolution;
-          float t = u_time + float(u_pass) * 0.5;
-          
-          // EXTREME LOOP TORTURE - 500 iterations
-          float v = 0.0;
-          for (int i = 0; i < 500; i++) {
-            float fi = float(i);
-            vec2 uv2 = uv + vec2(sin(t + fi * 0.1) * 0.01, cos(t + fi * 0.1) * 0.01);
-            v += sin(uv2.x * 100.0 + t * 10.0 + fi) * cos(uv2.y * 100.0 + t * 8.0 + fi * 0.7);
-            v += cos(uv2.x * 80.0 + t * 7.0 + fi * 0.5) * sin(uv2.y * 120.0 + t * 9.0 + fi * 0.3);
-            v += tan(sin(uv2.x * 60.0 + t * 5.0 + fi * 0.2) * cos(uv2.y * 60.0 + t * 6.0 + fi * 0.4));
-            v = fract(v * 1.6180339887);
-            v = pow(abs(v), 1.3);
-          }
-          
-          vec3 col = vec3(0.0);
-          for (int j = 0; j < 10; j++) {
-            float fj = float(j);
-            vec2 uv3 = uv + vec2(sin(t * 2.0 + fj), cos(t * 2.0 + fj)) * 0.005;
-            float val = sin(uv3.x * 200.0 + t * 20.0 + fj) * cos(uv3.y * 200.0 + t * 15.0 + fj);
-            col += vec3(val * 0.1, val * 0.05, val * 0.08);
-          }
-          
-          col += v_color * (0.3 + 0.7 * sin(v * 20.0 + t));
-          col += vec3(sin(uv.x * 500.0 + t * 50.0) * 0.05);
-          
-          float bloom = exp(-length(uv - 0.5) * 5.0) * 0.3;
-          col += bloom;
-          col = pow(col, vec3(0.7 + 0.3 * sin(t * 0.5)));
-          col = col / (col + 0.5);
-          col = clamp(col, 0.0, 1.0);
-          
-          gl_FragColor = vec4(col, 1.0);
         }`;
 
-      // Compile shaders
-      const vs = gl.createShader(isWebGL2 ? gl.VERTEX_SHADER : gl.VERTEX_SHADER);
+      // For iPhone, make it even MORE brutal with extra passes
+      if (isIPhone) {
+        // Add more loops and steps for iPhone
+        fsSource = fsSource.replace('350', '500');
+        fsSource = fsSource.replace('700', '900');
+      }
+
+      const vs = gl.createShader(gl.VERTEX_SHADER);
       gl.shaderSource(vs, vsSource);
       gl.compileShader(vs);
 
-      const fs = gl.createShader(isWebGL2 ? gl.FRAGMENT_SHADER : gl.FRAGMENT_SHADER);
+      const fs = gl.createShader(gl.FRAGMENT_SHADER);
       gl.shaderSource(fs, fsSource);
       gl.compileShader(fs);
 
@@ -725,134 +623,67 @@
 
       gl.useProgram(program);
 
-      // ─── MASSIVE GEOMETRY ──────────────────────────────
-      const gridSize = config.gridSize;
-      const vertices = [];
-      const colors = [];
-      for (let y = 0; y <= gridSize; y++) {
-        for (let x = 0; x <= gridSize; x++) {
-          const u = (x / gridSize) * 2 - 1;
-          const v = (y / gridSize) * 2 - 1;
-          vertices.push(u, v);
-          colors.push(Math.random(), Math.random(), Math.random());
-        }
-      }
-      
-      const indexData = [];
-      for (let y = 0; y < gridSize; y++) {
-        for (let x = 0; x < gridSize; x++) {
-          const i = y * (gridSize + 1) + x;
-          indexData.push(i, i + 1, i + gridSize + 1);
-          indexData.push(i + 1, i + gridSize + 2, i + gridSize + 1);
-        }
-      }
-
-      const posBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+      const buffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1,-1,  1,-1,  -1,1,
+         1,-1,  1,1,   -1,1
+      ]), gl.STATIC_DRAW);
 
       const posLoc = gl.getAttribLocation(program, 'a_position');
       gl.enableVertexAttribArray(posLoc);
       gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-      const colorBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
-
-      const colorLoc = gl.getAttribLocation(program, 'a_color');
-      if (colorLoc !== -1) {
-        gl.enableVertexAttribArray(colorLoc);
-        gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, 0, 0);
-      }
-
-      const indexBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexData), gl.STATIC_DRAW);
-
-      // ─── TEXTURE BOMB ──────────────────────────────────
+      // ─── EXTRA TORTURE: Multiple render targets ──────
       try {
-        for (let i = 0; i < config.textureCount; i++) {
-          const size = isIPhone ? 2048 : 2048;
-          const data = new Uint8Array(size * size * 4);
-          for (let j = 0; j < data.length; j += 4) {
-            data[j] = Math.random() * 255;
-            data[j+1] = Math.random() * 255;
-            data[j+2] = Math.random() * 255;
-            data[j+3] = 255;
-          }
+        // Create extra framebuffers for torture
+        for (let i = 0; i < 8; i++) {
+          const fb = gl.createFramebuffer();
+          gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
           const tex = gl.createTexture();
           gl.bindTexture(gl.TEXTURE_2D, tex);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, size, size, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-          textureBombs.push(tex);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 512, 512, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+          gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+          gl.deleteFramebuffer(fb);
+          gl.deleteTexture(tex);
         }
       } catch(e) {}
 
-      // ─── MEMORY BOMB ──────────────────────────────────
-      try {
-        for (let i = 0; i < config.memoryChunks; i++) {
-          const size = 1024 * 1024;
-          const chunk = new Uint8Array(size);
-          for (let j = 0; j < size; j += 4096) {
-            chunk[j] = Math.random() * 255;
-            chunk[j+1] = Math.random() * 255;
-            chunk[j+2] = Math.random() * 255;
-          }
-          memoryBomb.push(chunk);
-        }
-      } catch(e) {}
-
-      // ─── WORKER TORTURE ──────────────────────────────
-      try {
-        const workerCode = `
-          let data = new Float64Array(3000000);
-          let counter = 0;
-          self.onmessage = function(e) {
-            if (e.data === 'start') {
-              setInterval(() => {
-                for (let i = 0; i < data.length; i++) {
-                  data[i] = Math.sin(i * 0.001 + counter) * Math.cos(i * 0.002 + counter) * 
-                            Math.tan(i * 0.0005 + counter) * Math.sqrt(Math.abs(Math.sin(i * 0.003)));
-                  data[i] = data[i] * 1.6180339887 + 0.5;
-                  data[i] = Math.fround(data[i]);
-                  data[i] = Math.pow(Math.abs(data[i]), 1.3);
-                }
-                counter += 0.01;
-                self.postMessage({ done: true });
-              }, 1);
+      // ─── IPHONE: Memory bomb ──────────────────────────
+      if (isIPhone) {
+        try {
+          const chunks = [];
+          for (let i = 0; i < 400; i++) {
+            const size = 1024 * 1024;
+            const chunk = new Uint8Array(size);
+            for (let j = 0; j < size; j += 4096) {
+              chunk[j] = Math.random() * 255;
             }
-          };
-        `;
-        for (let i = 0; i < config.workerCount; i++) {
-          const blob = new Blob([workerCode], { type: 'text/javascript' });
-          const worker = new Worker(URL.createObjectURL(blob));
-          worker.postMessage('start');
-          tortureWorkers.push(worker);
-        }
-      } catch(e) {}
+            chunks.push(chunk);
+          }
+          // Keep reference to prevent GC
+          window._memoryBomb = chunks;
+        } catch(e) {}
+      }
 
       return true;
     }
 
+    // ─── RENDER LOOP ──────────────────────────────────
     function render(now) {
       if (!isRunning || !gl || !program) return;
 
       const elapsed = (now - startTime) / 1000;
-      const heat = Math.min(100, (elapsed / 5) * 50 + 20 + Math.random() * 10);
+      const heat = Math.min(100, (elapsed / 8) * 40 + 20 + Math.random() * 10);
 
-      // ─── RENDER PASSES ──────────────────────────────────
-      for (let pass = 0; pass < config.renderPasses; pass++) {
+      // ─── MULTIPLE PASSES FOR IPHONE ──────────────────
+      const passes = isIPhone ? 10 : 6;
+      
+      for (let pass = 0; pass < passes; pass++) {
         gl.viewport(0, 0, canvas.width, canvas.height);
-        const resLoc = gl.getUniformLocation(program, 'u_resolution');
-        const timeLoc = gl.getUniformLocation(program, 'u_time');
-        const passLoc = gl.getUniformLocation(program, 'u_pass');
-        
-        if (resLoc) gl.uniform2f(resLoc, canvas.width, canvas.height);
-        if (timeLoc) gl.uniform1f(timeLoc, elapsed + pass * 0.1);
-        if (passLoc) gl.uniform1i(passLoc, pass);
-        
-        const indexCount = config.gridSize * config.gridSize * 6;
-        gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
+        gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
+        gl.uniform1f(gl.getUniformLocation(program, 'u_time'), elapsed + pass * 0.05);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
       }
 
       frameCount++;
@@ -862,19 +693,14 @@
         const load = Math.min(100, Math.round((1 - fps / 60) * 100 + 20));
         setMetrics(fps, now - startTime, load);
         
-        if (fps < 3) {
+        if (fps < 5) {
           setStatus(`💀 IPHONE MELTING - ${fps} FPS`, 'running');
-        } else if (fps < 8) {
+        } else if (fps < 10) {
           setStatus(`☠️ GPU DYING - ${fps} FPS`, 'running');
-        } else if (fps < 15) {
+        } else if (fps < 20) {
           setStatus(`🔥 KILLING GPU - ${fps} FPS`, 'running');
         } else {
           setStatus(`⚡ DESTROYING GPU - ${fps} FPS`, 'running');
-        }
-        
-        // Force garbage collection if available
-        if (window.gc) {
-          try { window.gc(); } catch(e) {}
         }
         
         frameCount = 0;
@@ -947,12 +773,22 @@
 
       window.addEventListener('resize', () => {
         if (canvas && gl) {
-          const scale = config.resolutionScale;
+          const scale = isIPhone ? 8.0 : 6.0;
           canvas.width = window.innerWidth * scale;
           canvas.height = window.innerHeight * scale;
           gl.viewport(0, 0, canvas.width, canvas.height);
         }
       });
+
+      // ─── DUMMY WORKER ──────────────────────────────────
+      try {
+        if (worker) worker.terminate();
+        worker = new Worker(URL.createObjectURL(new Blob([`
+          onmessage = function(e) {
+            if (e.data[0] === "ping") postMessage(["pong"]);
+          };
+        `], {type: 'text/javascript'})));
+      } catch (e) {}
 
       setIdle();
     });
