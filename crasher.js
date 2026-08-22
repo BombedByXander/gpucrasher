@@ -5,6 +5,13 @@ let crashBtn = null;
 let stopBtn = null;
 let statusEl = null;
 let timeEl = null;
+let fpsEl = null;
+let loadEl = null;
+let loadBar = null;
+let loadBarContainer = null;
+let btnSub = null;
+let statusBadge = null;
+let statusDot = null;
 
 let gl = null;
 let program = null;
@@ -13,30 +20,36 @@ let startTime = 0;
 let animFrameId = null;
 let frameCount = 0;
 let lastFrameTime = 0;
+let lastFpsUpdate = 0;
 
 // ──────────────────────────────────────────────
 function ensureStatusTimer() {
   if (!statusEl) {
-    statusEl = document.createElement('div');
-    statusEl.id = 'status';
-    Object.assign(statusEl.style, {
-      position: 'fixed', top: '18px', left: '50%', transform: 'translateX(-50%)',
-      background: 'rgba(0,0,0,0.7)', color: '#dbeafe', padding: '10px 16px',
-      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
-      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
-    });
-    document.body.appendChild(statusEl);
+    statusEl = document.getElementById('statusText');
   }
   if (!timeEl) {
-    timeEl = document.createElement('div');
-    timeEl.id = 'time';
-    Object.assign(timeEl.style, {
-      position: 'fixed', top: '60px', left: '50%', transform: 'translateX(-50%)',
-      background: 'rgba(0,0,0,0.65)', color: '#d1fae5', padding: '8px 14px',
-      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
-      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
-    });
-    document.body.appendChild(timeEl);
+    timeEl = document.getElementById('timeValue');
+  }
+  if (!fpsEl) {
+    fpsEl = document.getElementById('fpsValue');
+  }
+  if (!loadEl) {
+    loadEl = document.getElementById('loadValue');
+  }
+  if (!loadBar) {
+    loadBar = document.getElementById('loadBar');
+  }
+  if (!loadBarContainer) {
+    loadBarContainer = document.getElementById('loadBarContainer');
+  }
+  if (!btnSub) {
+    btnSub = document.getElementById('btnSub');
+  }
+  if (!statusBadge) {
+    statusBadge = document.getElementById('statusBadge');
+  }
+  if (!statusDot) {
+    statusDot = document.getElementById('statusDot');
   }
 }
 
@@ -53,15 +66,46 @@ function setIdle() {
   isRunning = false;
   if (crashBtn) {
     crashBtn.disabled = false;
-    crashBtn.textContent = "CRASH GPU NOW";
+    crashBtn.className = 'crash-btn';
+    document.querySelector('.crash-btn .icon').textContent = '⚡';
+    document.getElementById('btnLabel').textContent = 'Crash GPU';
+    if (btnSub) btnSub.textContent = 'Click to initiate meltdown';
   }
+  if (stopBtn) stopBtn.style.display = 'none';
   if (animFrameId) {
     cancelAnimationFrame(animFrameId);
     animFrameId = null;
   }
+
   ensureStatusTimer();
-  if (statusEl) statusEl.textContent = "Idle – ready to burn";
-  if (timeEl) timeEl.textContent = formatTime(0);
+  if (statusEl) {
+    statusEl.textContent = 'Ready';
+    statusEl.style.color = '';
+  }
+  if (timeEl) timeEl.textContent = '00:00.000';
+  if (fpsEl) {
+    fpsEl.textContent = '--';
+    fpsEl.className = 'value';
+  }
+  if (loadEl) {
+    loadEl.innerHTML = '0<span class="unit">%</span>';
+    loadEl.className = 'value';
+  }
+  if (loadBar) loadBar.style.width = '0%';
+  if (loadBarContainer) loadBarContainer.classList.remove('active');
+  
+  if (statusBadge) {
+    statusBadge.className = 'status-badge';
+    if (statusDot) statusDot.style.background = '#22c55e';
+  }
+
+  // Clean up WebGL
+  if (gl) {
+    try {
+      if (program) gl.deleteProgram(program);
+      program = null;
+    } catch(e) {}
+  }
 }
 
 function createWebGLContext() {
@@ -70,9 +114,10 @@ function createWebGLContext() {
   canvas = document.createElement('canvas');
   canvas.style.position = 'fixed';
   canvas.style.inset = '0';
-  canvas.style.zIndex = '-999';
+  canvas.style.zIndex = '-1';
   canvas.style.pointerEvents = 'none';
-  document.body.appendChild(canvas);
+  canvas.style.opacity = '0.6';
+  document.body.prepend(canvas);
 
   const scale = 4.0;
   canvas.width = window.innerWidth * scale;
@@ -87,7 +132,7 @@ function createWebGLContext() {
 
   if (!gl) {
     ensureStatusTimer();
-    if (statusEl) statusEl.textContent = "No WebGL — your GPU is pussy";
+    if (statusEl) statusEl.textContent = 'No WebGL!';
     return false;
   }
 
@@ -153,7 +198,7 @@ function createWebGLContext() {
   if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS) || !gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
     console.error(gl.getShaderInfoLog(vs) || gl.getShaderInfoLog(fs));
     ensureStatusTimer();
-    if (statusEl) statusEl.textContent = "Shader died – GPU said fuck off";
+    if (statusEl) statusEl.textContent = 'Shader failed!';
     return false;
   }
 
@@ -165,7 +210,7 @@ function createWebGLContext() {
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
     console.error(gl.getProgramInfoLog(program));
     ensureStatusTimer();
-    if (statusEl) statusEl.textContent = "Link failed – program invalid";
+    if (statusEl) statusEl.textContent = 'Link failed!';
     return false;
   }
 
@@ -188,22 +233,57 @@ function createWebGLContext() {
 function render(now) {
   if (!isRunning || !gl || !program) return;
 
+  const elapsed = (now - startTime) / 1000;
+  const heat = Math.min(100, (elapsed / 8) * 40 + 20 + Math.random() * 10);
+
   gl.viewport(0, 0, canvas.width, canvas.height);
   gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
-  gl.uniform1f(gl.getUniformLocation(program, 'u_time'), (now - startTime) / 1000);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_time'), elapsed);
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   frameCount++;
-  if (frameCount % 10 === 0) {
-    const fps = Math.round(1000 / (now - lastFrameTime));
-    ensureStatusTimer();
-    if (statusEl) statusEl.textContent = `Nuking... ~${fps} FPS (pray)`;
-    lastFrameTime = now;
-  }
 
-  ensureStatusTimer();
-  if (timeEl) timeEl.textContent = formatTime(now - startTime);
+  if (now - lastFpsUpdate > 200) {
+    const fps = Math.round(frameCount / ((now - lastFpsUpdate) / 1000));
+    const load = Math.min(100, Math.round((1 - fps / 60) * 100 + 20));
+    
+    ensureStatusTimer();
+    if (fpsEl) {
+      fpsEl.textContent = fps;
+      fpsEl.className = 'value' + (fps < 10 ? ' danger' : fps < 25 ? ' warning' : '');
+    }
+    if (timeEl) timeEl.textContent = formatTime(now - startTime);
+    if (loadEl) {
+      loadEl.innerHTML = load + '<span class="unit">%</span>';
+      loadEl.className = 'value' + (load > 80 ? ' danger' : load > 50 ? ' warning' : '');
+    }
+    if (loadBar) loadBar.style.width = load + '%';
+    if (loadBarContainer) loadBarContainer.classList.add('active');
+
+    if (statusEl) {
+      if (fps < 10) {
+        statusEl.textContent = `☠️ DYING - ${fps} FPS`;
+        statusEl.style.color = '#ef4444';
+        if (statusBadge) statusBadge.className = 'status-badge active';
+      } else if (fps < 20) {
+        statusEl.textContent = `🔥 KILLING - ${fps} FPS`;
+        statusEl.style.color = '#f59e0b';
+        if (statusBadge) statusBadge.className = 'status-badge crashed';
+      } else {
+        statusEl.textContent = `⚡ DESTROYING - ${fps} FPS`;
+        statusEl.style.color = '#8b9bb5';
+        if (statusBadge) statusBadge.className = 'status-badge active';
+      }
+    }
+
+    if (btnSub) {
+      btnSub.textContent = fps < 10 ? '⚠️ System under extreme load' : '🔥 Pushing limits';
+    }
+
+    frameCount = 0;
+    lastFpsUpdate = now;
+  }
 
   animFrameId = requestAnimationFrame(render);
 }
@@ -212,22 +292,38 @@ function startNuke() {
   if (isRunning) {
     setIdle();
     ensureStatusTimer();
-    if (statusEl) statusEl.textContent = "Stopped – you survived... this time";
-    if (timeEl) timeEl.textContent = '--:--.---';
+    if (statusEl) statusEl.textContent = 'Stopped - You survived';
+    if (timeEl) timeEl.textContent = '00:00.000';
     if (stopBtn) stopBtn.style.display = 'none';
     return;
   }
 
   isRunning = true;
   if (crashBtn) {
-    crashBtn.disabled = false;
-    crashBtn.textContent = "Stop Crashing";
+    crashBtn.className = 'crash-btn running';
+    document.querySelector('.crash-btn .icon').textContent = '☠️';
+    document.getElementById('btnLabel').textContent = 'KILLING...';
+    if (btnSub) btnSub.textContent = '💀 Hold tight';
   }
-  if (stopBtn) stopBtn.style.display = 'inline-block';
+  if (stopBtn) stopBtn.style.display = 'flex';
 
   ensureStatusTimer();
-  if (statusEl) statusEl.textContent = "Nuking GPU – hold on tight";
-  if (timeEl) timeEl.textContent = formatTime(0);
+  if (statusEl) {
+    statusEl.textContent = '☠️ GPU MURDER INITIATED';
+    statusEl.style.color = '#f59e0b';
+    if (statusBadge) statusBadge.className = 'status-badge crashed';
+  }
+  if (timeEl) timeEl.textContent = '00:00.000';
+  if (fpsEl) {
+    fpsEl.textContent = '0';
+    fpsEl.className = 'value';
+  }
+  if (loadEl) {
+    loadEl.innerHTML = '0<span class="unit">%</span>';
+    loadEl.className = 'value';
+  }
+  if (loadBar) loadBar.style.width = '0%';
+  if (loadBarContainer) loadBarContainer.classList.add('active');
 
   if (!createWebGLContext()) {
     setIdle();
@@ -236,22 +332,33 @@ function startNuke() {
 
   startTime = performance.now();
   frameCount = 0;
-  lastFrameTime = startTime;
+  lastFpsUpdate = startTime;
   requestAnimationFrame(render);
 }
 
 // ──────────────────────────────────────────────
-// Wait for DOM
 document.addEventListener('DOMContentLoaded', () => {
   crashBtn = document.getElementById('crashBtn');
   stopBtn  = document.getElementById('stopBtn');
-  statusEl = document.getElementById('status');
-  timeEl   = document.getElementById('time');
+  statusEl = document.getElementById('statusText');
+  timeEl   = document.getElementById('timeValue');
+  fpsEl    = document.getElementById('fpsValue');
+  loadEl   = document.getElementById('loadValue');
+  loadBar  = document.getElementById('loadBar');
+  loadBarContainer = document.getElementById('loadBarContainer');
+  btnSub   = document.getElementById('btnSub');
+  statusBadge = document.getElementById('statusBadge');
+  statusDot   = document.getElementById('statusDot');
+
+  // ─── DEVICE BADGE ──────────────────────────────────────
+  const deviceBadge = document.getElementById('deviceBadge');
+  if (deviceBadge) {
+    const isIPhone = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    deviceBadge.textContent = isIPhone ? '📱 IPHONE MODE' : '💻 DESKTOP MODE';
+  }
 
   if (!crashBtn) {
     console.error("No #crashBtn element found");
-    ensureStatusTimer();
-    if (statusEl) statusEl.textContent = "Missing crash button – add it to HTML";
     return;
   }
 
@@ -261,24 +368,43 @@ document.addEventListener('DOMContentLoaded', () => {
     stopBtn.onclick = () => {
       setIdle();
       ensureStatusTimer();
-      if (statusEl) statusEl.textContent = "Stopped – you survived... this time";
-      if (timeEl) timeEl.textContent = '--:--.---';
+      if (statusEl) statusEl.textContent = 'Stopped - You survived';
+      if (timeEl) timeEl.textContent = '00:00.000';
       if (stopBtn) stopBtn.style.display = 'none';
-      if (crashBtn) crashBtn.textContent = "CRASH GPU NOW";
+      if (crashBtn) {
+        crashBtn.className = 'crash-btn';
+        document.querySelector('.crash-btn .icon').textContent = '⚡';
+        document.getElementById('btnLabel').textContent = 'Crash GPU';
+        if (btnSub) btnSub.textContent = 'Click to initiate meltdown';
+      }
     };
   }
 
-  // Dummy worker
-  try {
-    if (worker) worker.terminate();
-    worker = new Worker(URL.createObjectURL(new Blob([`
-      onmessage = function(e) {
-        if (e.data[0] === "ping") postMessage(["pong"]);
-      };
-    `], {type: 'text/javascript'})));
-  } catch (e) {}
+  // ─── KEYBOARD SHORTCUTS ──────────────────────────────
+  document.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      startNuke();
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (isRunning) {
+        setIdle();
+        ensureStatusTimer();
+        if (statusEl) statusEl.textContent = 'Stopped - You survived';
+        if (timeEl) timeEl.textContent = '00:00.000';
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (crashBtn) {
+          crashBtn.className = 'crash-btn';
+          document.querySelector('.crash-btn .icon').textContent = '⚡';
+          document.getElementById('btnLabel').textContent = 'Crash GPU';
+          if (btnSub) btnSub.textContent = 'Click to initiate meltdown';
+        }
+      }
+    }
+  });
 
-  // Resize handling
+  // ─── RESIZE ──────────────────────────────────────────────
   window.addEventListener('resize', () => {
     if (canvas) {
       const scale = 4.0;
@@ -287,6 +413,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
     }
   });
+
+  // ─── DUMMY WORKER ──────────────────────────────────────
+  try {
+    if (worker) worker.terminate();
+    worker = new Worker(URL.createObjectURL(new Blob([`
+      onmessage = function(e) {
+        if (e.data[0] === "ping") postMessage(["pong"]);
+      };
+    `], {type: 'text/javascript'})));
+  } catch (e) {}
 
   setIdle();
 });
