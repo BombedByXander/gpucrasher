@@ -7,13 +7,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    /* ─── RESET ─────────────────────────────────────────── */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       height: 100%;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -22,8 +16,6 @@
       overflow: hidden;
       user-select: none;
     }
-
-    /* ─── ANIMATED BACKGROUND ──────────────────────────────── */
     #bgCanvas {
       position: fixed;
       top: 0;
@@ -34,8 +26,6 @@
       pointer-events: none;
       opacity: 0.5;
     }
-
-    /* ─── GLOW ORBS ────────────────────────────────────── */
     .glow-orb {
       position: fixed;
       border-radius: 50%;
@@ -70,13 +60,11 @@
       transform: translate(-50%, -50%);
       animation-delay: -14s;
     }
-
     @keyframes floatOrb {
       0%, 100% { transform: translate(0, 0) scale(1); }
       33% { transform: translate(30px, -20px) scale(1.1); }
       66% { transform: translate(-20px, 30px) scale(0.9); }
     }
-
     .glow-overlay {
       position: fixed;
       inset: 0;
@@ -84,8 +72,6 @@
       pointer-events: none;
       background: radial-gradient(ellipse at 50% 50%, rgba(124, 58, 237, 0.05) 0%, transparent 70%);
     }
-
-    /* ─── MAIN CONTAINER ────────────────────────────────── */
     .container {
       position: relative;
       z-index: 2;
@@ -97,8 +83,6 @@
       padding: 30px 20px;
       gap: 24px;
     }
-
-    /* ─── HEADER ────────────────────────────────────── */
     .logo-section {
       display: flex;
       flex-direction: column;
@@ -134,8 +118,6 @@
       letter-spacing: 3px;
       text-transform: uppercase;
     }
-
-    /* ─── STATUS BADGE ──────────────────────────────────── */
     .status-badge {
       background: rgba(255, 255, 255, 0.04);
       backdrop-filter: blur(20px);
@@ -168,13 +150,10 @@
       background: #f59e0b;
       animation: pulse-dot 0.4s ease-in-out infinite;
     }
-
     @keyframes pulse-dot {
       0%, 100% { transform: scale(1); opacity: 1; }
       50% { transform: scale(1.6); opacity: 0.4; }
     }
-
-    /* ─── DEVICE BADGE ──────────────────────────────────── */
     .device-badge {
       font-size: 10px;
       color: #4a5a72;
@@ -185,8 +164,6 @@
       transition: all 0.4s ease;
       margin-top: -8px;
     }
-
-    /* ─── MAIN BUTTON ───────────────────────────────────── */
     .crash-btn {
       position: relative;
       background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 40%, #5b21b6 100%);
@@ -273,8 +250,6 @@
       margin-top: 2px;
       letter-spacing: 0.5px;
     }
-
-    /* ─── STOP BUTTON ───────────────────────────────────── */
     .stop-btn {
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -296,8 +271,6 @@
       border-color: rgba(239, 68, 68, 0.3);
       transform: scale(1.03);
     }
-
-    /* ─── METRICS PANEL ─────────────────────────────────── */
     .metrics {
       display: flex;
       gap: 40px;
@@ -337,8 +310,6 @@
       color: #4a5a72;
       margin-left: 2px;
     }
-
-    /* ─── LOAD BAR ───────────────────────────────────── */
     .load-bar-container {
       width: 100%;
       max-width: 320px;
@@ -360,8 +331,6 @@
       border-radius: 4px;
       transition: width 0.3s ease;
     }
-
-    /* ─── FOOTER ────────────────────────────────────────── */
     .footer {
       display: flex;
       flex-direction: column;
@@ -397,8 +366,6 @@
       max-width: 380px;
       line-height: 1.5;
     }
-
-    /* ─── KEYBOARD HINT ──────────────────────────────────── */
     .keyboard-hint {
       font-size: 11px;
       color: #3a4a62;
@@ -418,8 +385,6 @@
       border: 1px solid rgba(255, 255, 255, 0.06);
       font-family: 'Inter', sans-serif;
     }
-
-    /* ─── RESPONSIVE ────────────────────────────────────── */
     @media (max-width: 640px) {
       .crash-btn {
         padding: 18px 36px;
@@ -445,7 +410,6 @@
       .glow-orb-2 { width: 150px; height: 150px; }
       .glow-orb-3 { width: 300px; height: 300px; }
     }
-
     @media (max-width: 400px) {
       .crash-btn {
         padding: 16px 24px;
@@ -459,33 +423,26 @@
 </head>
 <body>
 
-  <!-- ─── BACKGROUND ────────────────────────────────────── -->
   <canvas id="bgCanvas"></canvas>
   <div class="glow-orb glow-orb-1"></div>
   <div class="glow-orb glow-orb-2"></div>
   <div class="glow-orb glow-orb-3"></div>
   <div class="glow-overlay"></div>
 
-  <!-- ─── MAIN CONTENT ──────────────────────────────────── -->
   <div class="container">
-
-    <!-- Logo -->
     <div class="logo-section">
       <div class="logo-icon">⚡</div>
       <div class="logo-title">GPU CRASHER</div>
       <div class="logo-sub">Extreme Stress Test</div>
     </div>
 
-    <!-- Status Badge -->
     <div class="status-badge" id="statusBadge">
       <span class="dot" id="statusDot"></span>
       <span id="statusText">Ready</span>
     </div>
 
-    <!-- Device Badge -->
     <div class="device-badge" id="deviceBadge">📱 Detecting device...</div>
 
-    <!-- Main Button -->
     <button class="crash-btn" id="crashBtn">
       <span class="icon">⚡</span>
       <span class="label">
@@ -495,12 +452,10 @@
       </span>
     </button>
 
-    <!-- Stop Button -->
     <button class="stop-btn" id="stopBtn">
       <span>⏹</span> Stop Torture
     </button>
 
-    <!-- Metrics -->
     <div class="metrics" id="metricsPanel">
       <div class="metric-item">
         <div class="value" id="fpsValue">--</div>
@@ -516,17 +471,14 @@
       </div>
     </div>
 
-    <!-- Load Bar -->
     <div class="load-bar-container" id="loadBarContainer">
       <div class="load-bar" id="loadBar"></div>
     </div>
 
-    <!-- Keyboard Hint -->
     <div class="keyboard-hint">
       <kbd>Space</kbd> or <kbd>Enter</kbd> · <kbd>Esc</kbd> to stop
     </div>
 
-    <!-- Footer -->
     <div class="footer">
       <div class="creator">
         Created by <a href="https://github.com/BombedByXander" target="_blank" rel="noreferrer">@prodbyxander</a>
@@ -535,13 +487,9 @@
         Engineered for virtual machines · Push the limits
       </div>
     </div>
-
   </div>
 
-  <!-- ─── SCRIPTS ────────────────────────────────────────── -->
   <script src="crasher.js"></script>
-  
-  <!-- ─── BACKGROUND ANIMATION ──────────────────────────── -->
   <script>
     (function initBackground() {
       const canvas = document.getElementById('bgCanvas');
