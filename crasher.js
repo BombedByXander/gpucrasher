@@ -46,6 +46,7 @@ let memoryBomb = [];
 let lastFps = 60;
 let consecutiveLowFps = 0;
 let escalationTimer = 0;
+let isEscalating = false;
 
 // ─── UI HELPERS ──────────────────────────────────────────
 function formatTime(ms) {
@@ -58,16 +59,20 @@ function formatTime(ms) {
 }
 
 function escalateTorture() {
+  if (isEscalating) return;
+  isEscalating = true;
+  
   CONFIG.escalationLevel++;
   
-  CONFIG.shaderLoops = Math.min(200, CONFIG.shaderLoops + 15);
-  CONFIG.raymarchSteps = Math.min(700, CONFIG.raymarchSteps + 30);
-  CONFIG.renderPasses = Math.min(40, CONFIG.renderPasses + 3);
-  CONFIG.resolutionScale = Math.min(8.0, CONFIG.resolutionScale + 0.3);
-  CONFIG.memoryChunks = Math.min(600, CONFIG.memoryChunks + 30);
+  CONFIG.shaderLoops = Math.min(250, CONFIG.shaderLoops + 20);
+  CONFIG.raymarchSteps = Math.min(800, CONFIG.raymarchSteps + 40);
+  CONFIG.renderPasses = Math.min(50, CONFIG.renderPasses + 5);
+  CONFIG.resolutionScale = Math.min(10.0, CONFIG.resolutionScale + 0.5);
+  CONFIG.memoryChunks = Math.min(800, CONFIG.memoryChunks + 50);
   
+  // ─── MEMORY BOMB ──────────────────────────────────────
   try {
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 50; i++) {
       const size = 1024 * 1024;
       const chunk = new Uint8Array(size);
       for (let j = 0; j < size; j += 4096) {
@@ -77,6 +82,7 @@ function escalateTorture() {
     }
   } catch(e) {}
   
+  // ─── DESTROY AND RECREATE CONTEXT ────────────────────
   if (gl && program) {
     try {
       gl.deleteProgram(program);
@@ -91,6 +97,7 @@ function escalateTorture() {
     } catch(e) {}
   }
   
+  // ─── FORCE GC ──────────────────────────────────────────
   if (window.gc) {
     try { window.gc(); } catch(e) {}
   }
@@ -100,26 +107,29 @@ function escalateTorture() {
     statusEl.style.color = '#ef4444';
   }
   
-  // ─── TRIGGER GLITCH ON ESCALATION ──────────────────────
+  // ─── TRIGGER GLITCH STORM ─────────────────────────────
   if (window.glitchSystem && window.glitchSystem.isRunning) {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       setTimeout(() => {
         window.glitchSystem.randomGlitch();
-      }, i * 100);
+      }, i * 50);
     }
   }
   
   console.log(`🔥 ESCALATED to Level ${CONFIG.escalationLevel}: ${CONFIG.renderPasses} passes, ${CONFIG.shaderLoops} loops`);
   
   setTimeout(() => {
+    isEscalating = false;
     if (isRunning) {
       createWebGLContext();
     }
-  }, 100);
+  }, 200);
 }
 
 function setIdle() {
   isRunning = false;
+  isEscalating = false;
+  
   if (crashBtn) {
     crashBtn.disabled = false;
     crashBtn.className = 'crash-btn';
@@ -239,11 +249,9 @@ function createWebGLContext() {
       uniform float u_time;
       uniform int u_pass;
 
-      // ─── CZNULL-STYLE TRIG CHAOS ──────────────────────
       float poisonMushroom(vec3 p, float t) {
         float v = 0.0;
         float amp = 1.0;
-        // Dynamic loops - this is what kills the GPU
         for (int i = 0; i < ${currentLoops}; i++) {
           float fi = float(i);
           v += amp * sin(p.x * 13.7 + t * 2.4 + fi * 0.01);
@@ -253,9 +261,11 @@ function createWebGLContext() {
           amp *= 0.39;
           p += vec3(sin(t * 0.9 + fi * 0.001), cos(t * 1.3 + fi * 0.001), sin(t * 0.7 + fi * 0.001));
           p = p * 1.001 + 0.001;
-          // Extra chaos on higher escalation
           if (${CONFIG.escalationLevel} > 5) {
             p = abs(p) - 0.5;
+          }
+          if (${CONFIG.escalationLevel} > 10) {
+            p = vec3(sin(p.x + t), cos(p.y + t), tan(p.z + t));
           }
         }
         return v;
@@ -265,7 +275,6 @@ function createWebGLContext() {
         vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
         float t = u_time * 0.5 + float(u_pass) * 0.05;
         
-        // ─── CZNULL CAMERA ORBIT ──────────────────────────
         vec3 ro = vec3(
           sin(t * 0.3) * 6.0,
           cos(t * 0.4) * 4.0 + 2.0,
@@ -276,7 +285,6 @@ function createWebGLContext() {
         float dist = 0.0;
         float accum = 0.0;
 
-        // ─── RAYMARCH THE POISON MUSHROOM ────────────────
         for (int i = 0; i < ${currentSteps}; i++) {
           vec3 p = ro + rd * dist;
           float density = abs(poisonMushroom(p * 3.8 + t * 1.6, t)) * 0.12;
@@ -287,31 +295,25 @@ function createWebGLContext() {
           if (dist > 100.0 || accum > 15.0) break;
         }
 
-        // ─── POISON COLOR PALETTE ──────────────────────────
         vec3 col = 0.5 + 0.5 * vec3(
           sin(accum * 5.1 + t * 2.4 + accum * 2.0),
           cos(accum * 6.8 + t * 2.1 + accum * 1.5),
           sin(accum * 4.7 + t * 1.2 + accum * 3.0)
         );
         
-        // ─── POISON GLOW ──────────────────────────────────
         float glow = exp(-accum * 0.3) * 0.2;
         col += glow * vec3(0.8, 0.2, 0.8);
         
-        // ─── SCANLINE TORTURE ──────────────────────────────
         float scanline = sin(uv.y * 1200.0 + t * 200.0) * 0.03;
         col += scanline;
         
-        // ─── VHS CHAOS ────────────────────────────────────
         float vhs = sin(uv.x * 800.0 + t * 150.0) * 0.02;
         col += vhs;
         
-        // ─── RGB SPLIT ──────────────────────────────────────
         float split = sin(uv.y * 5.0 + t * 2.0) * 0.02;
         col.r += split;
         col.b -= split;
         
-        // ─── POST-PROCESSING ──────────────────────────────
         col = pow(col, vec3(0.8 + 0.3 * sin(t * 0.1)));
         col = col / (col + 0.8);
         col = clamp(col, 0.0, 1.0);
@@ -343,6 +345,9 @@ function createWebGLContext() {
           p = p * 1.001 + 0.001;
           if (${CONFIG.escalationLevel} > 5) {
             p = abs(p) - 0.5;
+          }
+          if (${CONFIG.escalationLevel} > 10) {
+            p = vec3(sin(p.x + t), cos(p.y + t), tan(p.z + t));
           }
         }
         return v;
@@ -437,6 +442,7 @@ function createWebGLContext() {
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
+  // ─── MEMORY BOMB ──────────────────────────────────────
   if (CONFIG.memoryChunks > 0) {
     try {
       for (let i = 0; i < CONFIG.memoryChunks; i++) {
@@ -563,6 +569,7 @@ function startNuke() {
   CONFIG.escalationLevel = 0;
   consecutiveLowFps = 0;
   escalationTimer = 0;
+  isEscalating = false;
   
   if (crashBtn) {
     crashBtn.className = 'crash-btn running';
