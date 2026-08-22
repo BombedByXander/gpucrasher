@@ -20,6 +20,8 @@ let startTime = 0;
 let animFrameId = null;
 let frameCount = 0;
 let lastFpsUpdate = 0;
+let visualCanvas = null;
+let visualCtx = null;
 
 // ─── HARDWARE DETECTION ──────────────────────────────────
 function isLowEndDevice() {
@@ -55,6 +57,133 @@ function formatTime(ms) {
   const seconds = String(Math.floor((total % 60000) / 1000)).padStart(2, '0');
   const millis = String(total % 1000).padStart(3, '0');
   return `${minutes}:${seconds}.${millis}`;
+}
+
+// ─── CZNULL-STYLE VISUAL CHAOS ──────────────────────────
+function startVisualChaos() {
+  // Create the visual canvas overlay
+  visualCanvas = document.createElement('canvas');
+  visualCanvas.style.position = 'fixed';
+  visualCanvas.style.inset = '0';
+  visualCanvas.style.zIndex = '10';
+  visualCanvas.style.pointerEvents = 'none';
+  visualCanvas.style.opacity = '0.85';
+  visualCanvas.style.mixBlendMode = 'screen';
+  document.body.appendChild(visualCanvas);
+  
+  visualCtx = visualCanvas.getContext('2d');
+  
+  // Resize the canvas
+  function resizeVisual() {
+    visualCanvas.width = window.innerWidth;
+    visualCanvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resizeVisual);
+  resizeVisual();
+  
+  // Start the visual chaos animation
+  renderVisualChaos();
+}
+
+function renderVisualChaos() {
+  if (!isRunning || !visualCtx) return;
+  
+  const w = visualCanvas.width;
+  const h = visualCanvas.height;
+  const ctx = visualCtx;
+  
+  // Clear with slight trail effect for motion blur
+  ctx.fillStyle = 'rgba(5, 6, 10, 0.15)';
+  ctx.fillRect(0, 0, w, h);
+  
+  const time = (Date.now() - startTime) / 1000;
+  const escalationFactor = 1 + CONFIG.escalationLevel * 0.1;
+  
+  // ─── CZNULL-STYLE POISON MUSHROOM VISUAL ──────────────
+  // Using WebGL-like math in 2D canvas for maximum chaos
+  
+  const centerX = w / 2;
+  const centerY = h / 2;
+  const scale = Math.min(w, h) * 0.3 * escalationFactor;
+  
+  // Draw the "poison mushroom" with trig chaos
+  const imageData = ctx.createImageData(w, h);
+  const data = imageData.data;
+  
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      
+      // Normalize coordinates
+      const nx = (x - centerX) / scale;
+      const ny = (y - centerY) / scale;
+      const nz = 0.5 + 0.5 * Math.sin(time * 0.3);
+      
+      // ─── CZNULL-STYLE TRIG CHAOS ──────────────────────
+      // Massive trig function - this is what makes it "poison mushroom"
+      let v = 0.0;
+      let amp = 1.0;
+      
+      // Dynamic loop count based on escalation
+      const loops = Math.min(80 + CONFIG.escalationLevel * 5, 200);
+      
+      for (let i = 0; i < loops; i++) {
+        const fi = i * 0.01;
+        v += amp * Math.sin(nx * 13.7 + time * 2.4 + fi);
+        v += amp * Math.cos(ny * 16.9 + time * 2.8 + fi * 0.7);
+        v += amp * Math.sin(nz * 10.3 + time * 1.6 + fi * 1.3) * Math.cos(nx * 5.3 + ny * 3.7 + time);
+        v = Math.abs(v) * 0.5 + 0.5;
+        amp *= 0.39;
+      }
+      
+      // Color from chaos - the "poison" colors
+      const r = 0.5 + 0.5 * Math.sin(v * 5.1 + time * 2.4 + nx * 2.0);
+      const g = 0.5 + 0.5 * Math.cos(v * 6.8 + time * 2.1 + ny * 1.5);
+      const b = 0.5 + 0.5 * Math.sin(v * 4.7 + time * 1.2 + nz * 3.0);
+      
+      // ─── ADD MORE CHAOS ──────────────────────────────────
+      // Scanline distortion
+      const scanline = Math.sin(y * 0.5 + time * 20.0) * 0.05;
+      // RGB split effect
+      const split = Math.sin(y * 0.1 + time * 5.0) * 0.02;
+      // VHS noise
+      const noise = Math.random() * 0.05;
+      
+      data[i] = Math.min(1, Math.max(0, r + scanline + split + noise)) * 255;
+      data[i+1] = Math.min(1, Math.max(0, g + scanline - split + noise * 0.8)) * 255;
+      data[i+2] = Math.min(1, Math.max(0, b + scanline + split * 0.5 + noise * 1.2)) * 255;
+      data[i+3] = 255;
+    }
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+  
+  // ─── ADD GLITCHY TEXT OVERLAY ──────────────────────────
+  if (Math.random() < 0.05) {
+    ctx.fillStyle = 'rgba(255, 0, 255, 0.05)';
+    ctx.fillRect(Math.random() * w, Math.random() * h, Math.random() * 200 + 50, 2 + Math.random() * 8);
+  }
+  
+  // ─── FPS AND STATUS OVERLAY ────────────────────────────
+  if (fpsEl) {
+    const fps = parseInt(fpsEl.textContent) || 0;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(10, 10, 200, 60);
+    ctx.fillStyle = fps < 10 ? '#ef4444' : fps < 25 ? '#f59e0b' : '#22c55e';
+    ctx.font = '12px monospace';
+    ctx.fillText(`⚡ Level ${CONFIG.escalationLevel}`, 20, 30);
+    ctx.fillText(`🔥 ${CONFIG.renderPasses}x passes`, 20, 50);
+  }
+  
+  requestAnimationFrame(renderVisualChaos);
+}
+
+function stopVisualChaos() {
+  if (visualCanvas) {
+    visualCanvas.remove();
+    visualCanvas = null;
+    visualCtx = null;
+  }
 }
 
 function escalateTorture() {
@@ -102,7 +231,7 @@ function escalateTorture() {
   
   // ─── TRIGGER GLITCH ON ESCALATION ──────────────────────
   if (window.glitchSystem && window.glitchSystem.isRunning) {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       setTimeout(() => {
         window.glitchSystem.randomGlitch();
       }, i * 100);
@@ -139,6 +268,9 @@ function setIdle() {
   if (window.glitchSystem) {
     window.glitchSystem.stop();
   }
+  
+  // ─── STOP VISUAL CHAOS ──────────────────────────────────
+  stopVisualChaos();
 
   memoryBomb = [];
   CONFIG.escalationLevel = 0;
@@ -538,6 +670,9 @@ function startNuke() {
     return;
   }
 
+  // ─── START VISUAL CHAOS ──────────────────────────────────
+  startVisualChaos();
+
   // ─── START GLITCHES ──────────────────────────────────────
   if (window.glitchSystem) {
     setTimeout(() => {
@@ -630,6 +765,10 @@ document.addEventListener('DOMContentLoaded', function() {
       canvas.width = window.innerWidth * scale;
       canvas.height = window.innerHeight * scale;
       gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+    if (visualCanvas) {
+      visualCanvas.width = window.innerWidth;
+      visualCanvas.height = window.innerHeight;
     }
   });
 
