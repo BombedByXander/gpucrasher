@@ -1,4 +1,4 @@
-// ─── ORIGINAL CODE - CRANKED TO 11 (iPhone SE 3rd Gen FIXED) ──
+// ─── ORIGINAL CODE - CRANKED TO 11 (SE 3rd Gen GUARANTEED) ──
 let worker = null;
 let isRunning = false;
 
@@ -27,17 +27,17 @@ const isIPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
 
 // ─── IPHONE SE 3RD GEN DETECTION ──────────────────────
 const isIPhoneSE = /iPhone/.test(navigator.userAgent) && 
-                   (navigator.userAgent.includes('iPhone13,2') || // SE 3rd Gen
-                    navigator.userAgent.includes('iPhone14,6')); // SE 3rd Gen variant
+                   (navigator.userAgent.includes('iPhone13,2') || 
+                    navigator.userAgent.includes('iPhone14,6'));
 
 // ─── TORTURE CONFIG ──────────────────────────────────────
 const CONFIG = {
-  // SE 3rd Gen gets SIMPLER shader but MORE passes
-  shaderLoops: isIPhoneSE ? 100 : (isIPhone ? 200 : 110),
-  raymarchSteps: isIPhoneSE ? 300 : (isIPhone ? 600 : 420),
-  renderPasses: isIPhoneSE ? 20 : (isIPhone ? 12 : 1),  // 20 passes on SE!
-  resolutionScale: isIPhoneSE ? 8.0 : (isIPhone ? 6.0 : 4.0),
-  memoryChunks: isIPhoneSE ? 500 : (isIPhone ? 400 : 0)
+  // SE 3rd Gen gets SIMPLEST shader but MAXIMUM passes
+  shaderLoops: isIPhoneSE ? 50 : (isIPhone ? 200 : 110),
+  raymarchSteps: isIPhoneSE ? 150 : (isIPhone ? 600 : 420),
+  renderPasses: isIPhoneSE ? 30 : (isIPhone ? 12 : 1),  // 30 PASSES on SE!
+  resolutionScale: isIPhoneSE ? 10.0 : (isIPhone ? 6.0 : 4.0), // 10x resolution!
+  memoryChunks: isIPhoneSE ? 600 : (isIPhone ? 400 : 0)
 };
 
 // ─── MEMORY BOMB ──────────────────────────────────────────
@@ -92,7 +92,6 @@ function setIdle() {
     animFrameId = null;
   }
 
-  // Clean up memory bomb
   memoryBomb = [];
   if (window.gc) {
     try { window.gc(); } catch(e) {}
@@ -115,7 +114,6 @@ function setIdle() {
   if (loadBar) loadBar.style.width = '0%';
   if (loadBarContainer) loadBarContainer.classList.remove('active');
   
-  // Reset status badge
   const badge = document.getElementById('statusBadge');
   if (badge) {
     badge.className = 'status-badge';
@@ -123,7 +121,6 @@ function setIdle() {
     if (dot) dot.style.background = '#22c55e';
   }
 
-  // Clean up WebGL
   if (gl) {
     try {
       if (program) gl.deleteProgram(program);
@@ -167,54 +164,38 @@ function createWebGLContext() {
     attribute vec2 a_position;
     void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
 
-  // ─── FRAGMENT SHADER (iPhone SE 3rd Gen COMPATIBLE) ──
-  // SIMPLER operations - NO atan(), NO fract() on complex expressions
+  // ─── FRAGMENT SHADER (SE 3rd Gen - ULTRA SIMPLE) ──
+  // NO pow(), NO atan(), NO fract() - just sin/cos loops
   const fsSource = `
     precision highp float;
     uniform vec2 u_resolution;
     uniform float u_time;
 
-    float trigHell(vec3 p) {
-      float v = 0.0;
-      float amp = 1.0;
-      // SE 3rd Gen gets fewer loops but MORE passes
-      for (int i = 0; i < ${CONFIG.shaderLoops}; i++) {
-        float fi = float(i);
-        // SIMPLER trig operations - no atan
-        v += amp * sin(p.x * 13.7 + u_time * 2.4 + fi * 0.01);
-        v += amp * cos(p.y * 16.9 + u_time * 2.8 + fi * 0.01);
-        v += amp * sin(p.z * 10.3 + u_time * 1.6 + fi * 0.01) * cos(p.z * 5.3 + u_time * 1.2);
-        v = v * 0.5 + 0.5;
-        v = v * v * v * v; // Simpler than fract
-        amp *= 0.39;
-        p += vec3(sin(u_time * 0.9 + fi * 0.001), cos(u_time * 1.3 + fi * 0.001), sin(u_time * 0.7 + fi * 0.001));
-      }
-      return v;
-    }
-
     void main() {
       vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
-      vec3 ro = vec3(sin(u_time * 0.8) * 5.0, cos(u_time * 1.0) * 4.0, -10.0);
-      vec3 rd = normalize(vec3(uv * 2.2, 1.9 + sin(u_time * 0.5) * 0.5));
-
-      float dist = 0.0;
-      float accum = 0.0;
-
-      for (int i = 0; i < ${CONFIG.raymarchSteps}; i++) {
-        vec3 p = ro + rd * dist;
-        float density = abs(trigHell(p * 3.8 + u_time * 1.6)) * 0.12;
-        accum += density * exp(-dist * 0.018);
-        accum += sin(dist * 22.0 + u_time * 7.0) * cos(dist * 15.0) * 0.035;
-        dist += max(0.05, density * 0.42);
-        if (dist > 80.0 || accum > 10.0) break;
+      
+      // ULTRA SIMPLE but BRUTAL loop - just sin/cos spam
+      float v = 0.0;
+      for (int i = 0; i < ${CONFIG.shaderLoops}; i++) {
+        float fi = float(i);
+        float x = uv.x * 50.0 + u_time * 5.0 + fi * 0.5;
+        float y = uv.y * 50.0 + u_time * 4.0 + fi * 0.3;
+        v += sin(x) * cos(y);
+        v += cos(x * 1.3 + fi) * sin(y * 1.7 + fi);
+        v = v * 0.5 + 0.5;
       }
-
-      vec3 col = 0.5 + 0.5 * vec3(
-        sin(accum * 5.1 + u_time * 2.4),
-        cos(accum * 6.8 + u_time * 2.1),
-        sin(accum * 4.7 + u_time * 1.2)
-      );
-
+      
+      // Color from the chaos
+      vec3 col = vec3(
+        sin(v * 10.0 + u_time),
+        cos(v * 8.0 + u_time * 0.7),
+        sin(v * 12.0 + u_time * 1.3)
+      ) * 0.5 + 0.5;
+      
+      // Scanline torture
+      float scanline = sin(uv.y * 800.0 + u_time * 100.0) * 0.05;
+      col += scanline;
+      
       gl_FragColor = vec4(col, 1.0);
     }`;
 
@@ -281,7 +262,7 @@ function render(now) {
   if (!isRunning || !gl || !program) return;
 
   const elapsed = (now - startTime) / 1000;
-  const heat = Math.min(100, (elapsed / 8) * 40 + 20 + Math.random() * 10);
+  const heat = Math.min(100, (elapsed / 5) * 50 + 20 + Math.random() * 10);
 
   // ─── MULTIPLE PASSES ──────────────────────────────
   for (let pass = 0; pass < CONFIG.renderPasses; pass++) {
@@ -313,22 +294,22 @@ function render(now) {
     // Update status
     if (statusEl) {
       if (fps < 5) {
-        statusEl.textContent = `💀 MELTING - ${fps} FPS`;
+        statusEl.textContent = `💀 SE MELTING - ${fps} FPS`;
         statusEl.style.color = '#ef4444';
         const badge = document.getElementById('statusBadge');
         if (badge) { badge.className = 'status-badge active'; }
       } else if (fps < 10) {
-        statusEl.textContent = `☠️ DYING - ${fps} FPS`;
+        statusEl.textContent = `☠️ SE DYING - ${fps} FPS`;
         statusEl.style.color = '#ef4444';
         const badge = document.getElementById('statusBadge');
         if (badge) { badge.className = 'status-badge active'; }
       } else if (fps < 20) {
-        statusEl.textContent = `🔥 KILLING - ${fps} FPS`;
+        statusEl.textContent = `🔥 SE KILLING - ${fps} FPS`;
         statusEl.style.color = '#f59e0b';
         const badge = document.getElementById('statusBadge');
         if (badge) { badge.className = 'status-badge crashed'; }
       } else {
-        statusEl.textContent = `⚡ DESTROYING - ${fps} FPS`;
+        statusEl.textContent = `⚡ SE DESTROYING - ${fps} FPS`;
         statusEl.style.color = '#8b9bb5';
         const badge = document.getElementById('statusBadge');
         if (badge) { badge.className = 'status-badge active'; }
@@ -336,7 +317,7 @@ function render(now) {
     }
 
     if (btnSub) {
-      btnSub.textContent = fps < 10 ? '⚠️ System under extreme load' : '🔥 Pushing limits';
+      btnSub.textContent = fps < 10 ? '⚠️ SE under extreme load' : '🔥 30 passes torture';
     }
 
     frameCount = 0;
@@ -359,15 +340,15 @@ function startNuke() {
   isRunning = true;
   if (crashBtn) {
     crashBtn.className = 'crash-btn running';
-    document.querySelector('.crash-btn .icon').textContent = isIPhone ? '🔥' : '☠️';
+    document.querySelector('.crash-btn .icon').textContent = isIPhoneSE ? '🔥' : (isIPhone ? '🔥' : '☠️');
     document.getElementById('btnLabel').textContent = isIPhoneSE ? '🔥 MELTING SE...' : (isIPhone ? '🔥 MELTING IPHONE...' : '💀 KILLING...');
-    if (btnSub) btnSub.textContent = isIPhoneSE ? '🔥 20x torture passes' : '🔥 System at critical';
+    if (btnSub) btnSub.textContent = isIPhoneSE ? '🔥 30 passes · 10x resolution' : '🔥 System at critical';
   }
   if (stopBtn) stopBtn.style.display = 'flex';
 
   ensureStatusTimer();
   if (statusEl) {
-    statusEl.textContent = isIPhoneSE ? '🔥 SE TORTURE MODE (20x passes)' : (isIPhone ? '🔥 IPHONE TORTURE MODE' : '☠️ GPU MURDER INITIATED');
+    statusEl.textContent = isIPhoneSE ? '🔥 SE TORTURE MODE (30 passes)' : (isIPhone ? '🔥 IPHONE TORTURE MODE' : '☠️ GPU MURDER INITIATED');
     statusEl.style.color = '#f59e0b';
     const badge = document.getElementById('statusBadge');
     if (badge) { badge.className = 'status-badge crashed'; }
@@ -411,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const deviceBadge = document.getElementById('deviceBadge');
   if (deviceBadge) {
     if (isIPhoneSE) {
-      deviceBadge.textContent = '📱 IPHONE SE 3RD GEN - 20x PASSES';
+      deviceBadge.textContent = '📱 SE 3RD GEN - 30 PASSES';
       deviceBadge.classList.add('iphone');
     } else if (isIPhone) {
       deviceBadge.textContent = '📱 IPHONE MODE - EXTREME';
