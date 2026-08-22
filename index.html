@@ -7,12 +7,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       height: 100%;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -21,7 +16,6 @@
       overflow: hidden;
       user-select: none;
     }
-
     #bgCanvas {
       position: fixed;
       top: 0;
@@ -32,7 +26,6 @@
       pointer-events: none;
       opacity: 0.6;
     }
-
     .glow-overlay {
       position: fixed;
       inset: 0;
@@ -40,7 +33,6 @@
       pointer-events: none;
       background: radial-gradient(ellipse at 50% 50%, rgba(124, 58, 237, 0.08) 0%, transparent 70%);
     }
-
     .container {
       position: relative;
       z-index: 2;
@@ -52,7 +44,6 @@
       padding: 30px 20px;
       gap: 28px;
     }
-
     .status-badge {
       background: rgba(255, 255, 255, 0.04);
       backdrop-filter: blur(20px);
@@ -85,12 +76,10 @@
       background: #f59e0b;
       animation: pulse-dot 0.4s ease-in-out infinite;
     }
-
     @keyframes pulse-dot {
       0%, 100% { transform: scale(1); opacity: 1; }
       50% { transform: scale(1.6); opacity: 0.4; }
     }
-
     .crash-btn {
       position: relative;
       background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 40%, #5b21b6 100%);
@@ -137,13 +126,8 @@
       cursor: not-allowed;
       transform: none;
     }
-    .crash-btn .icon {
-      font-size: 26px;
-      line-height: 1;
-    }
-    .crash-btn .label {
-      position: relative;
-    }
+    .crash-btn .icon { font-size: 26px; line-height: 1; }
+    .crash-btn .label { position: relative; }
     .crash-btn .label .shine {
       position: absolute;
       top: -20%;
@@ -161,7 +145,6 @@
       0% { transform: translateX(-100%) rotate(25deg); }
       100% { transform: translateX(200%) rotate(25deg); }
     }
-
     .stop-btn {
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -183,7 +166,6 @@
       border-color: rgba(239, 68, 68, 0.3);
       transform: scale(1.03);
     }
-
     .metrics {
       display: flex;
       gap: 30px;
@@ -217,7 +199,6 @@
       color: #6b7d98;
       margin-top: 4px;
     }
-
     .footer {
       display: flex;
       flex-direction: column;
@@ -253,7 +234,6 @@
       max-width: 380px;
       line-height: 1.5;
     }
-
     .keyboard-hint {
       font-size: 11px;
       color: #3a4a62;
@@ -273,7 +253,14 @@
       border: 1px solid rgba(255, 255, 255, 0.06);
       font-family: 'Inter', sans-serif;
     }
-
+    .device-badge {
+      font-size: 10px;
+      color: #4a5a72;
+      background: rgba(255,255,255,0.03);
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
     @media (max-width: 640px) {
       .crash-btn {
         padding: 18px 32px;
@@ -294,7 +281,6 @@
       .status-badge { font-size: 11px; padding: 6px 16px; }
       .footer .subtext { font-size: 11px; max-width: 280px; }
     }
-
     @media (max-width: 400px) {
       .crash-btn {
         padding: 16px 24px;
@@ -316,6 +302,8 @@
       <span class="dot" id="statusDot"></span>
       <span id="statusText">Ready</span>
     </div>
+
+    <div class="device-badge" id="deviceBadge">📱 Detecting device...</div>
 
     <button class="crash-btn" id="crashBtn">
       <span class="icon">⚡</span>
@@ -359,6 +347,45 @@
   </div>
 
   <script>
+    // ─── DETECT IPHONE ──────────────────────────────────────
+    const isIPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) || 
+                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/.test(navigator.userAgent);
+    
+    document.getElementById('deviceBadge').textContent = isIPhone ? '📱 IPHONE MODE - EXTREME TORTURE' : 
+                                                         isMobile ? '📱 MOBILE MODE' : '💻 DESKTOP MODE';
+
+    // ─── TORTURE CONFIG ──────────────────────────────────
+    const TORTURE = {
+      // Desktop mode (WebGL2)
+      desktop: {
+        shaderLoops: 250,
+        raymarchSteps: 600,
+        renderPasses: 6,
+        memoryChunks: 300,
+        workerSpam: true,
+        textureBomb: true,
+        resolutionScale: 6.0,
+        geoSpam: false
+      },
+      // iPhone/mobile mode (BRUTAL in different ways)
+      mobile: {
+        shaderLoops: 30,        // Less shader complexity (iPhone hates this less)
+        raymarchSteps: 50,      // Fewer steps
+        renderPasses: 25,       // 25x fill-rate torture (iPhone HATES this)
+        memoryChunks: 600,      // 600MB memory bomb (forces iOS to swap)
+        workerSpam: true,
+        textureBomb: true,
+        resolutionScale: 8.0,   // 8x resolution (iPhone has small screen but this kills it)
+        geoSpam: true,          // Extra geometry spam
+        cpuSpin: true,          // Block main thread
+        contextLoss: true       // Force context loss attempts
+      }
+    };
+
+    // Use the right config
+    const config = (isIPhone || isMobile) ? TORTURE.mobile : TORTURE.desktop;
+
     // ─── BACKGROUND ANIMATION ──────────────────────────────
     (function initBackground() {
       const canvas = document.getElementById('bgCanvas');
@@ -442,15 +469,7 @@
     let frameCount = 0;
     let lastFrameTime = 0;
     let lastFpsUpdate = 0;
-
-    const TORTURE = {
-      shaderLoops: 250,
-      raymarchSteps: 600,
-      renderPasses: 6,
-      memoryChunks: 300,
-      workerSpam: true,
-      textureBomb: true
-    };
+    let geoSpamBuffers = [];
 
     let memoryBomb = [];
     let textureBombs = [];
@@ -512,6 +531,7 @@
       memoryBomb = [];
       textureBombs = [];
       extraBuffers = [];
+      geoSpamBuffers = [];
       tortureWorkers.forEach(w => { try { w.terminate(); } catch(e) {} });
       tortureWorkers = [];
 
@@ -530,6 +550,17 @@
       setMetrics(0, 0, 0);
     }
 
+    // ─── IPHONE CPU SPIN ──────────────────────────────────
+    function cpuSpin(duration) {
+      const start = performance.now();
+      let x = 0;
+      while (performance.now() - start < duration) {
+        x = Math.sin(x) * Math.cos(x + 1) * Math.tan(x + 2);
+        x = x * 1.6180339887 + 0.5;
+      }
+    }
+
+    // ─── WEBGL CONTEXT ──────────────────────────────────
     function createWebGLContext() {
       if (canvas) return true;
       
@@ -541,162 +572,221 @@
       canvas.style.opacity = '0.7';
       document.body.prepend(canvas);
 
-      const scale = 6.0;
+      const scale = config.resolutionScale;
       canvas.width = window.innerWidth * scale;
       canvas.height = window.innerHeight * scale;
 
+      // Try WebGL2 first, fallback to WebGL1
       gl = canvas.getContext('webgl2', {
         antialias: false,
         powerPreference: 'high-performance',
         desynchronized: true,
         preserveDrawingBuffer: false,
         failIfMajorPerformanceCaveat: false
-      }) || canvas.getContext('webgl');
+      });
+
+      if (!gl) {
+        gl = canvas.getContext('webgl', {
+          antialias: false,
+          powerPreference: 'high-performance',
+          preserveDrawingBuffer: false
+        });
+      }
 
       if (!gl) {
         setStatus('No WebGL!', 'idle');
         return false;
       }
 
-      const vsSource = `#version 300 es
-        in vec2 a_position;
-        in vec3 a_color;
-        out vec3 v_color;
-        uniform float u_time;
-        void main() {
-          vec2 pos = a_position;
-          float wave = sin(pos.x * 30.0 + u_time * 5.0) * 0.1;
-          wave += cos(pos.y * 25.0 + u_time * 4.0) * 0.1;
-          wave += sin((pos.x + pos.y) * 40.0 + u_time * 7.0) * 0.05;
-          pos += wave;
-          gl_Position = vec4(pos, 0.0, 1.0);
-          v_color = a_color + vec3(sin(u_time + pos.x * 50.0), cos(u_time + pos.y * 50.0), 0.0) * 0.3;
-        }`;
+      // Detect if WebGL2
+      const isWebGL2 = gl.getParameter(gl.VERSION).includes('WebGL 2');
 
-      const fsSource = `#version 300 es
-        precision highp float;
-        precision highp int;
-        out vec4 fragColor;
-        uniform vec2 u_resolution;
-        uniform float u_time;
-        uniform int u_pass;
+      // ─── Shaders ──────────────────────────────────────
+      let vsSource, fsSource;
 
-        float hash(vec3 p) {
-          p = fract(p * 0.3183099 + 0.1);
-          p *= 17.0;
-          return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-        }
-        
-        float noise3D(vec3 p) {
-          vec3 i = floor(p);
-          vec3 f = fract(p);
-          f = f * f * (3.0 - 2.0 * f);
-          return mix(
-            mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),
-                mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
-            mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
-                mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z
-          );
-        }
-        
-        float fbm(vec3 p) {
-          float v = 0.0;
-          float a = 0.5;
-          for (int i = 0; i < 25; i++) {
-            v += a * noise3D(p);
-            p *= 2.7;
-            a *= 0.38;
+      if (isWebGL2) {
+        vsSource = `#version 300 es
+          in vec2 a_position;
+          in vec3 a_color;
+          out vec3 v_color;
+          uniform float u_time;
+          void main() {
+            vec2 pos = a_position;
+            float wave = sin(pos.x * 30.0 + u_time * 5.0) * 0.1;
+            wave += cos(pos.y * 25.0 + u_time * 4.0) * 0.1;
+            wave += sin((pos.x + pos.y) * 40.0 + u_time * 7.0) * 0.05;
+            pos += wave;
+            gl_Position = vec4(pos, 0.0, 1.0);
+            v_color = a_color + vec3(sin(u_time + pos.x * 50.0), cos(u_time + pos.y * 50.0), 0.0) * 0.3;
+          }`;
+
+        fsSource = `#version 300 es
+          precision highp float;
+          precision highp int;
+          out vec4 fragColor;
+          uniform vec2 u_resolution;
+          uniform float u_time;
+          uniform int u_pass;
+
+          float hash(vec3 p) {
+            p = fract(p * 0.3183099 + 0.1);
+            p *= 17.0;
+            return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
           }
-          return v;
-        }
-
-        float trigHell(vec3 p, float t) {
-          float v = 0.0;
-          float amp = 1.0;
-          for (int i = 0; i < 250; i++) {
-            float fi = float(i);
-            v += amp * sin(p.x * 13.7 + t * 2.4 + fi * 0.1);
-            v += amp * cos(p.y * 16.9 + t * 2.8 + fi * 0.13);
-            v += amp * tan(atan(p.z * 10.3 + t * 1.6 + fi * 0.07) * 1.4);
-            v += amp * sin(cos(tan(v * 4.1 + fi * 0.05)) * 5.3);
-            v += amp * cos(sin(v * 3.7 + fi * 0.03) * 4.9);
-            v += amp * atan(sin(v * 6.3 + t * 2.1) * 1.7);
-            v = fract(v * 1.6180339887);
-            amp *= 0.37;
-            p += vec3(sin(t * 0.9 + fi * 0.02), cos(t * 1.3 + fi * 0.025), tan(t * 0.7 + fi * 0.015));
-            p = abs(p) - 0.5;
-            p = vec3(sin(p.x + t), cos(p.y + t), tan(p.z + t));
+          
+          float noise3D(vec3 p) {
+            vec3 i = floor(p);
+            vec3 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(
+              mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),
+                  mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+              mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                  mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z
+            );
           }
-          return v;
-        }
-
-        float raymarch(vec3 ro, vec3 rd, float t) {
-          float dist = 0.0;
-          float accum = 0.0;
-          for (int i = 0; i < 600; i++) {
-            vec3 p = ro + rd * dist;
-            float density = abs(trigHell(p * 3.8 + t * 1.6, t)) * 0.12;
-            density += abs(sin(p.x * 50.0 + t * 20.0) * cos(p.y * 50.0 + t * 15.0)) * 0.02;
-            density += abs(cos(p.z * 45.0 + t * 18.0) * sin(p.x * 55.0 + t * 22.0)) * 0.02;
-            accum += density * exp(-dist * 0.018);
-            accum += sin(dist * 22.0 + t * 7.0) * cos(dist * 15.0) * 0.035;
-            accum += cos(dist * 33.0 + t * 9.0) * sin(dist * 27.0) * 0.025;
-            dist += max(0.02, density * 0.38);
-            if (dist > 100.0 || accum > 15.0) break;
+          
+          float fbm(vec3 p) {
+            float v = 0.0;
+            float a = 0.5;
+            for (int i = 0; i < 25; i++) {
+              v += a * noise3D(p);
+              p *= 2.7;
+              a *= 0.38;
+            }
+            return v;
           }
-          return accum;
-        }
 
-        void main() {
-          vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
-          float t = u_time * 0.5 + float(u_pass) * 0.15;
-          
-          vec3 ro = vec3(
-            sin(t * 0.8) * 8.0 * cos(t * 0.3),
-            cos(t * 0.6) * 5.0 + sin(t * 0.4) * 2.0,
-            -12.0 + sin(t * 0.7) * 4.0
-          );
-          vec3 rd = normalize(vec3(
-            uv * 2.2 + sin(t * 0.5 + uv.y * 3.0) * 0.3,
-            1.9 + sin(t * 0.5) * 0.8 + cos(uv.x * 5.0 + t) * 0.2
-          ));
-
-          float total = 0.0;
-          for (int s = 0; s < 4; s++) {
-            float fi = float(s);
-            vec2 offset = vec2(sin(fi * 1.7 + t * 2.0), cos(fi * 1.3 + t * 1.5)) * 0.003;
-            vec3 rd2 = normalize(rd + vec3(offset, 0.0));
-            total += raymarch(ro, rd2, t + fi * 0.02);
+          float trigHell(vec3 p, float t) {
+            float v = 0.0;
+            float amp = 1.0;
+            for (int i = 0; i < ${config.shaderLoops}; i++) {
+              float fi = float(i);
+              v += amp * sin(p.x * 13.7 + t * 2.4 + fi * 0.1);
+              v += amp * cos(p.y * 16.9 + t * 2.8 + fi * 0.13);
+              v += amp * tan(atan(p.z * 10.3 + t * 1.6 + fi * 0.07) * 1.4);
+              v += amp * sin(cos(tan(v * 4.1 + fi * 0.05)) * 5.3);
+              v += amp * cos(sin(v * 3.7 + fi * 0.03) * 4.9);
+              v += amp * atan(sin(v * 6.3 + t * 2.1) * 1.7);
+              v = fract(v * 1.6180339887);
+              amp *= 0.37;
+              p += vec3(sin(t * 0.9 + fi * 0.02), cos(t * 1.3 + fi * 0.025), tan(t * 0.7 + fi * 0.015));
+              p = abs(p) - 0.5;
+              p = vec3(sin(p.x + t), cos(p.y + t), tan(p.z + t));
+            }
+            return v;
           }
-          total /= 4.0;
 
-          vec3 col = 0.5 + 0.5 * vec3(
-            sin(total * 5.1 + t * 2.4 + total * 2.0),
-            cos(total * 6.8 + t * 2.1 + total * 1.5),
-            sin(total * 4.7 + t * 1.2 + total * 3.0)
-          );
-          
-          col += vec3(
-            sin(total * 50.0 + t * 30.0) * 0.05,
-            cos(total * 45.0 + t * 25.0) * 0.05,
-            sin(total * 55.0 + t * 35.0) * 0.05
-          );
-          
-          float scanline = sin(uv.y * 1200.0 + t * 200.0) * 0.03;
-          col += scanline;
-          float bloom = exp(-total * 0.5) * 0.1;
-          col += bloom;
-          col = pow(col, vec3(0.8 + 0.3 * sin(t * 0.1)));
-          col = col / (col + 0.8);
-          
-          fragColor = vec4(col, 1.0);
-        }`;
+          float raymarch(vec3 ro, vec3 rd, float t) {
+            float dist = 0.0;
+            float accum = 0.0;
+            for (int i = 0; i < ${config.raymarchSteps}; i++) {
+              vec3 p = ro + rd * dist;
+              float density = abs(trigHell(p * 3.8 + t * 1.6, t)) * 0.12;
+              density += abs(sin(p.x * 50.0 + t * 20.0) * cos(p.y * 50.0 + t * 15.0)) * 0.02;
+              density += abs(cos(p.z * 45.0 + t * 18.0) * sin(p.x * 55.0 + t * 22.0)) * 0.02;
+              accum += density * exp(-dist * 0.018);
+              accum += sin(dist * 22.0 + t * 7.0) * cos(dist * 15.0) * 0.035;
+              accum += cos(dist * 33.0 + t * 9.0) * sin(dist * 27.0) * 0.025;
+              dist += max(0.02, density * 0.38);
+              if (dist > 100.0 || accum > 15.0) break;
+            }
+            return accum;
+          }
 
-      const vs = gl.createShader(gl.VERTEX_SHADER);
+          void main() {
+            vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
+            float t = u_time * 0.5 + float(u_pass) * 0.15;
+            
+            vec3 ro = vec3(
+              sin(t * 0.8) * 8.0 * cos(t * 0.3),
+              cos(t * 0.6) * 5.0 + sin(t * 0.4) * 2.0,
+              -12.0 + sin(t * 0.7) * 4.0
+            );
+            vec3 rd = normalize(vec3(
+              uv * 2.2 + sin(t * 0.5 + uv.y * 3.0) * 0.3,
+              1.9 + sin(t * 0.5) * 0.8 + cos(uv.x * 5.0 + t) * 0.2
+            ));
+
+            float total = 0.0;
+            for (int s = 0; s < 4; s++) {
+              float fi = float(s);
+              vec2 offset = vec2(sin(fi * 1.7 + t * 2.0), cos(fi * 1.3 + t * 1.5)) * 0.003;
+              vec3 rd2 = normalize(rd + vec3(offset, 0.0));
+              total += raymarch(ro, rd2, t + fi * 0.02);
+            }
+            total /= 4.0;
+
+            vec3 col = 0.5 + 0.5 * vec3(
+              sin(total * 5.1 + t * 2.4 + total * 2.0),
+              cos(total * 6.8 + t * 2.1 + total * 1.5),
+              sin(total * 4.7 + t * 1.2 + total * 3.0)
+            );
+            
+            col += vec3(
+              sin(total * 50.0 + t * 30.0) * 0.05,
+              cos(total * 45.0 + t * 25.0) * 0.05,
+              sin(total * 55.0 + t * 35.0) * 0.05
+            );
+            
+            float scanline = sin(uv.y * 1200.0 + t * 200.0) * 0.03;
+            col += scanline;
+            float bloom = exp(-total * 0.5) * 0.1;
+            col += bloom;
+            col = pow(col, vec3(0.8 + 0.3 * sin(t * 0.1)));
+            col = col / (col + 0.8);
+            
+            fragColor = vec4(col, 1.0);
+          }`;
+      } else {
+        // WebGL1 fallback (simpler shader but more render passes)
+        vsSource = `
+          attribute vec2 a_position;
+          attribute vec3 a_color;
+          varying vec3 v_color;
+          uniform float u_time;
+          void main() {
+            vec2 pos = a_position;
+            float wave = sin(pos.x * 30.0 + u_time * 5.0) * 0.1;
+            wave += cos(pos.y * 25.0 + u_time * 4.0) * 0.1;
+            pos += wave;
+            gl_Position = vec4(pos, 0.0, 1.0);
+            v_color = a_color + vec3(sin(u_time + pos.x * 50.0), cos(u_time + pos.y * 50.0), 0.0) * 0.3;
+          }`;
+
+        fsSource = `
+          precision highp float;
+          varying vec3 v_color;
+          uniform vec2 u_resolution;
+          uniform float u_time;
+          uniform int u_pass;
+
+          void main() {
+            vec2 uv = gl_FragCoord.xy / u_resolution;
+            float t = u_time + float(u_pass) * 0.5;
+            
+            // Simple but BRUTAL loop torture
+            float v = 0.0;
+            for (int i = 0; i < 100; i++) {
+              float fi = float(i);
+              v += sin(uv.x * 50.0 + t * 2.0 + fi) * cos(uv.y * 50.0 + t * 1.5 + fi * 0.5);
+              v += cos(uv.x * 40.0 + t * 1.8 + fi * 0.7) * sin(uv.y * 60.0 + t * 2.2 + fi * 0.3);
+              v = fract(v * 1.618);
+            }
+            
+            vec3 col = v_color * (0.5 + 0.5 * sin(v * 10.0 + t));
+            col += vec3(sin(uv.x * 100.0 + t * 20.0) * 0.05);
+            
+            gl_FragColor = vec4(col, 1.0);
+          }`;
+      }
+
+      // Compile shaders
+      const vs = gl.createShader(isWebGL2 ? gl.VERTEX_SHADER : gl.VERTEX_SHADER);
       gl.shaderSource(vs, vsSource);
       gl.compileShader(vs);
 
-      const fs = gl.createShader(gl.FRAGMENT_SHADER);
+      const fs = gl.createShader(isWebGL2 ? gl.FRAGMENT_SHADER : gl.FRAGMENT_SHADER);
       gl.shaderSource(fs, fsSource);
       gl.compileShader(fs);
 
@@ -719,7 +809,8 @@
 
       gl.useProgram(program);
 
-      const gridSize = 80;
+      // ─── Geometry ─────────────────────────────────────
+      const gridSize = isIPhone ? 120 : 80; // More geometry on iPhone
       const vertices = [];
       const colors = [];
       for (let y = 0; y <= gridSize; y++) {
@@ -762,9 +853,11 @@
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indexData), gl.STATIC_DRAW);
 
+      // ─── Texture Bomb ─────────────────────────────────
       try {
-        for (let i = 0; i < 30; i++) {
-          const size = 2048;
+        const texCount = isIPhone ? 40 : 30;
+        for (let i = 0; i < texCount; i++) {
+          const size = isIPhone ? 1024 : 2048;
           const data = new Uint8Array(size * size * 4);
           for (let j = 0; j < data.length; j += 4) {
             data[j] = Math.random() * 255;
@@ -780,8 +873,10 @@
         }
       } catch(e) {}
 
+      // ─── Memory Bomb ──────────────────────────────────
       try {
-        for (let i = 0; i < TORTURE.memoryChunks; i++) {
+        const chunks = isIPhone ? 600 : 300;
+        for (let i = 0; i < chunks; i++) {
           const size = 1024 * 1024;
           const chunk = new Uint8Array(size);
           for (let j = 0; j < size; j += 4096) {
@@ -793,8 +888,10 @@
         }
       } catch(e) {}
 
+      // ─── Extra Buffers ────────────────────────────────
       try {
-        for (let i = 0; i < 20; i++) {
+        const bufCount = isIPhone ? 40 : 20;
+        for (let i = 0; i < bufCount; i++) {
           const buf = gl.createBuffer();
           gl.bindBuffer(gl.ARRAY_BUFFER, buf);
           gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(1000000), gl.DYNAMIC_DRAW);
@@ -802,7 +899,22 @@
         }
       } catch(e) {}
 
-      if (TORTURE.workerSpam) {
+      // ─── Geometry Spam (iPhone only) ──────────────────
+      if (config.geoSpam) {
+        try {
+          for (let i = 0; i < 100; i++) {
+            const buf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+            const data = new Float32Array(10000);
+            for (let j = 0; j < data.length; j++) data[j] = Math.random() * 2 - 1;
+            gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+            geoSpamBuffers.push(buf);
+          }
+        } catch(e) {}
+      }
+
+      // ─── Worker Torture ──────────────────────────────
+      if (config.workerSpam) {
         try {
           const workerCode = `
             let data = new Float64Array(2000000);
@@ -823,7 +935,8 @@
               }
             };
           `;
-          for (let i = 0; i < 12; i++) {
+          const workerCount = isIPhone ? 16 : 12;
+          for (let i = 0; i < workerCount; i++) {
             const blob = new Blob([workerCode], { type: 'text/javascript' });
             const worker = new Worker(URL.createObjectURL(blob));
             worker.postMessage('start');
@@ -841,7 +954,14 @@
       const elapsed = (now - startTime) / 1000;
       const heat = Math.min(100, (elapsed / 10) * 40 + 20 + Math.random() * 10);
 
-      for (let pass = 0; pass < TORTURE.renderPasses; pass++) {
+      // ─── CPU SPIN (iPhone torture) ──────────────────────
+      if (config.cpuSpin && isIPhone) {
+        cpuSpin(5); // Block main thread for 5ms every frame
+      }
+
+      // ─── Multiple Render Passes ──────────────────────
+      const passes = config.renderPasses;
+      for (let pass = 0; pass < passes; pass++) {
         gl.viewport(0, 0, canvas.width, canvas.height);
         const resLoc = gl.getUniformLocation(program, 'u_resolution');
         const timeLoc = gl.getUniformLocation(program, 'u_time');
@@ -851,8 +971,26 @@
         if (timeLoc) gl.uniform1f(timeLoc, elapsed + pass * 0.1);
         if (passLoc) gl.uniform1i(passLoc, pass);
         
-        const indexCount = 80 * 80 * 6;
+        const gridSize = isIPhone ? 120 : 80;
+        const indexCount = gridSize * gridSize * 6;
         gl.drawElements(gl.TRIANGLES, indexCount, gl.UNSIGNED_SHORT, 0);
+      }
+
+      // ─── Geometry Spam (iPhone only) ──────────────────
+      if (config.geoSpam && isIPhone) {
+        try {
+          for (let i = 0; i < 10; i++) {
+            const buf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+            const data = new Float32Array(10000);
+            for (let j = 0; j < data.length; j++) data[j] = Math.random() * 2 - 1;
+            gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+            geoSpamBuffers.push(buf);
+            if (geoSpamBuffers.length > 200) {
+              gl.deleteBuffer(geoSpamBuffers.shift());
+            }
+          }
+        } catch(e) {}
       }
 
       frameCount++;
@@ -861,7 +999,9 @@
         const fps = Math.round(frameCount / ((now - lastFpsUpdate) / 1000));
         setMetrics(fps, now - startTime, heat);
         
-        if (fps < 10) {
+        if (fps < 5) {
+          setStatus(`💀 IPHONE MELTING - ${fps} FPS`, 'running');
+        } else if (fps < 10) {
           setStatus(`☠️ MURDERING GPU - ${fps} FPS`, 'running');
         } else if (fps < 25) {
           setStatus(`🔥 KILLING GPU - ${fps} FPS`, 'running');
@@ -886,12 +1026,12 @@
       isRunning = true;
       if (crashBtn) {
         crashBtn.className = 'crash-btn running';
-        btnLabel.textContent = 'KILLING...';
-        document.querySelector('.crash-btn .icon').textContent = '☠️';
+        btnLabel.textContent = isIPhone ? 'MELTING IPHONE...' : 'KILLING...';
+        document.querySelector('.crash-btn .icon').textContent = isIPhone ? '🔥' : '☠️';
       }
       if (stopBtn) stopBtn.style.display = 'flex';
       
-      setStatus('☠️ GPU MURDER INITIATED', 'crashed');
+      setStatus(isIPhone ? '🔥 IPHONE TORTURE MODE' : '☠️ GPU MURDER INITIATED', 'crashed');
       setMetrics(0, 0, 0);
 
       if (!createWebGLContext()) {
@@ -939,7 +1079,7 @@
 
       window.addEventListener('resize', () => {
         if (canvas && gl) {
-          const scale = 6.0;
+          const scale = config.resolutionScale;
           canvas.width = window.innerWidth * scale;
           canvas.height = window.innerHeight * scale;
           gl.viewport(0, 0, canvas.width, canvas.height);
