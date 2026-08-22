@@ -1,586 +1,308 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>GPU CRASHER | @prodbyxander</title>
-  <link rel="preconnect" href="https://fonts.gstatic.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
-  <style>
-    /* ─── RESET ─────────────────────────────────────────── */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html, body {
-      height: 100%;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #05060a;
-      color: #e8edf5;
-      overflow: hidden;
-      user-select: none;
-    }
-
-    /* ─── ANIMATED 3D BACKGROUND ───────────────────────── */
-    #bgCanvas {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      z-index: 0;
-      pointer-events: none;
-      opacity: 0.5;
-    }
-
-    /* ─── GLOW ORBS ────────────────────────────────────── */
-    .glow-orb {
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(80px);
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.3;
-      animation: floatOrb 20s ease-in-out infinite;
-    }
-    .glow-orb-1 {
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, rgba(124, 58, 237, 0.3), transparent 70%);
-      top: -100px;
-      right: -100px;
-      animation-delay: 0s;
-    }
-    .glow-orb-2 {
-      width: 300px;
-      height: 300px;
-      background: radial-gradient(circle, rgba(236, 72, 153, 0.2), transparent 70%);
-      bottom: -50px;
-      left: -50px;
-      animation-delay: -7s;
-    }
-    .glow-orb-3 {
-      width: 500px;
-      height: 500px;
-      background: radial-gradient(circle, rgba(59, 130, 246, 0.15), transparent 70%);
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      animation-delay: -14s;
-    }
-
-    @keyframes floatOrb {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      33% { transform: translate(30px, -20px) scale(1.1); }
-      66% { transform: translate(-20px, 30px) scale(0.9); }
-    }
-
-    .glow-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 1;
-      pointer-events: none;
-      background: radial-gradient(ellipse at 50% 50%, rgba(124, 58, 237, 0.05) 0%, transparent 70%);
-    }
-
-    /* ─── MAIN CONTAINER ────────────────────────────────── */
-    .container {
-      position: relative;
-      z-index: 2;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 30px 20px;
-      gap: 28px;
-    }
-
-    /* ─── HEADER LOGO ────────────────────────────────────── */
-    .logo-section {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-    }
-    .logo-icon {
-      font-size: 48px;
-      line-height: 1;
-      background: linear-gradient(135deg, #7c3aed, #ec4899);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      animation: pulseIcon 3s ease-in-out infinite;
-    }
-    @keyframes pulseIcon {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-    }
-    .logo-title {
-      font-size: 28px;
-      font-weight: 900;
-      letter-spacing: -0.5px;
-      background: linear-gradient(135deg, #e8edf5 0%, #8b9bb5 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .logo-sub {
-      font-size: 12px;
-      font-weight: 400;
-      color: #4a5a72;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-    }
-
-    /* ─── STATUS BADGE ──────────────────────────────────── */
-    .status-badge {
-      background: rgba(255, 255, 255, 0.04);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 100px;
-      padding: 8px 24px;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.3px;
-      color: #8b9bb5;
-      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .status-badge .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #22c55e;
-      display: inline-block;
-      transition: all 0.4s ease;
-    }
-    .status-badge.active .dot {
-      background: #ef4444;
-      animation: pulse-dot 0.8s ease-in-out infinite;
-    }
-    .status-badge.crashed .dot {
-      background: #f59e0b;
-      animation: pulse-dot 0.4s ease-in-out infinite;
-    }
-    .status-badge .status-text {
-      transition: color 0.4s ease;
-    }
-    .status-badge.active .status-text {
-      color: #ef4444;
-    }
-    .status-badge.crashed .status-text {
-      color: #f59e0b;
-    }
-
-    @keyframes pulse-dot {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.6); opacity: 0.4; }
-    }
-
-    /* ─── DEVICE BADGE ──────────────────────────────────── */
-    .device-badge {
-      font-size: 10px;
-      color: #4a5a72;
-      background: rgba(255, 255, 255, 0.03);
-      padding: 4px 14px;
-      border-radius: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      transition: all 0.4s ease;
-      margin-top: -8px;
-    }
-    .device-badge.iphone {
-      border-color: rgba(239, 68, 68, 0.2);
-      color: #f87171;
-    }
-
-    /* ─── MAIN BUTTON ───────────────────────────────────── */
-    .crash-btn {
-      position: relative;
-      background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 40%, #5b21b6 100%);
-      border: none;
-      color: white;
-      padding: 24px 56px;
-      border-radius: 20px;
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      cursor: pointer;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 
-        0 4px 20px rgba(124, 58, 237, 0.3),
-        0 0 60px rgba(124, 58, 237, 0.1),
-        inset 0 1px 0 rgba(255, 255, 255, 0.15);
-      font-family: 'Inter', sans-serif;
-      min-width: 260px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      overflow: hidden;
-    }
-    .crash-btn::before {
-      content: '';
-      position: absolute;
-      inset: -2px;
-      border-radius: 22px;
-      background: linear-gradient(135deg, rgba(124, 58, 237, 0.5), rgba(236, 72, 153, 0.3));
-      z-index: -1;
-      filter: blur(12px);
-      opacity: 0;
-      transition: opacity 0.4s ease;
-    }
-    .crash-btn:hover:not(:disabled)::before {
-      opacity: 1;
-    }
-    .crash-btn:hover:not(:disabled) {
-      transform: translateY(-4px) scale(1.02);
-      box-shadow: 
-        0 8px 40px rgba(124, 58, 237, 0.5),
-        0 0 80px rgba(124, 58, 237, 0.2);
-    }
-    .crash-btn:active:not(:disabled) {
-      transform: translateY(0) scale(0.97);
-    }
-    .crash-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-    }
-    .crash-btn .icon {
-      font-size: 28px;
-      line-height: 1;
-      transition: transform 0.3s ease;
-    }
-    .crash-btn.running .icon {
-      animation: spin-icon 0.5s linear infinite;
-    }
-    @keyframes spin-icon {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .crash-btn .label {
-      position: relative;
-    }
-    .crash-btn .label .shine {
-      position: absolute;
-      top: -30%;
-      left: -10%;
-      width: 120%;
-      height: 160%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-      transform: translateX(-100%) rotate(25deg);
-      animation: none;
-    }
-    .crash-btn.running .label .shine {
-      animation: shine-sweep 2s ease-in-out infinite;
-    }
-    @keyframes shine-sweep {
-      0% { transform: translateX(-100%) rotate(25deg); }
-      100% { transform: translateX(200%) rotate(25deg); }
-    }
-    .crash-btn .btn-sub {
-      font-size: 11px;
-      font-weight: 400;
-      opacity: 0.6;
-      display: block;
-      margin-top: 2px;
-      letter-spacing: 0.5px;
-    }
-
-    /* ─── STOP BUTTON ───────────────────────────────────── */
-    .stop-btn {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: #f87171;
-      padding: 14px 40px;
-      border-radius: 14px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      font-family: 'Inter', sans-serif;
-      display: none;
-      align-items: center;
-      gap: 10px;
-      backdrop-filter: blur(10px);
-    }
-    .stop-btn:hover {
-      background: rgba(239, 68, 68, 0.12);
-      border-color: rgba(239, 68, 68, 0.3);
-      transform: scale(1.03);
-    }
-    .stop-btn .stop-icon {
-      font-size: 18px;
-    }
-
-    /* ─── METRICS PANEL ─────────────────────────────────── */
-    .metrics {
-      display: flex;
-      gap: 40px;
-      padding: 18px 36px;
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      border-radius: 18px;
-      min-width: 340px;
-      justify-content: center;
-      transition: all 0.4s ease;
-    }
-    .metrics.active {
-      border-color: rgba(239, 68, 68, 0.15);
-    }
-    .metric-item {
-      text-align: center;
-      position: relative;
-    }
-    .metric-item::after {
-      content: '';
-      position: absolute;
-      right: -20px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 1px;
-      height: 30px;
-      background: rgba(255, 255, 255, 0.05);
-    }
-    .metric-item:last-child::after {
-      display: none;
-    }
-    .metric-item .value {
-      font-size: 26px;
-      font-weight: 800;
-      color: #e8edf5;
-      font-variant-numeric: tabular-nums;
-      transition: color 0.3s ease;
-      letter-spacing: -0.5px;
-    }
-    .metric-item .value.danger { color: #ef4444; }
-    .metric-item .value.warning { color: #f59e0b; }
-    .metric-item .value.success { color: #22c55e; }
-    .metric-item .label {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: #4a5a72;
-      margin-top: 4px;
-    }
-    .metric-item .unit {
-      font-size: 14px;
-      font-weight: 400;
-      color: #4a5a72;
-      margin-left: 2px;
-    }
-
-    /* ─── PROGRESS BAR ───────────────────────────────────── */
-    .load-bar-container {
-      width: 100%;
-      max-width: 340px;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 4px;
-      overflow: hidden;
-      margin-top: -8px;
-      opacity: 0;
-      transition: opacity 0.4s ease;
-    }
-    .load-bar-container.active {
-      opacity: 1;
-    }
-    .load-bar {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444);
-      border-radius: 4px;
-      transition: width 0.3s ease;
-    }
-
-    /* ─── FOOTER ────────────────────────────────────────── */
-    .footer {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      margin-top: 8px;
-    }
-    .footer .creator {
-      color: #4a5a72;
-      font-size: 14px;
-      font-weight: 400;
-      letter-spacing: 0.2px;
-    }
-    .footer .creator a {
-      color: #6b7d98;
-      text-decoration: none;
-      font-weight: 600;
-      transition: color 0.3s ease;
-      border-bottom: 1px solid rgba(107, 125, 152, 0.15);
-      padding-bottom: 2px;
-    }
-    .footer .creator a:hover {
-      color: #a78bfa;
-      border-bottom-color: rgba(167, 139, 250, 0.3);
-    }
-    .footer .subtext {
-      color: #3a4a62;
-      font-size: 12px;
-      font-weight: 400;
-      letter-spacing: 0.3px;
-      opacity: 0.6;
-      text-align: center;
-      max-width: 380px;
-      line-height: 1.5;
-    }
-
-    /* ─── KEYBOARD HINT ──────────────────────────────────── */
-    .keyboard-hint {
-      font-size: 11px;
-      color: #3a4a62;
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: -12px;
-    }
-    .keyboard-hint kbd {
-      background: rgba(255, 255, 255, 0.05);
-      padding: 2px 12px;
-      border-radius: 6px;
-      font-size: 10px;
-      font-weight: 700;
-      color: #4a5a72;
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      font-family: 'Inter', sans-serif;
-    }
-
-    /* ─── RESPONSIVE ────────────────────────────────────── */
-    @media (max-width: 640px) {
-      .crash-btn {
-        padding: 20px 36px;
-        font-size: 20px;
-        min-width: 200px;
-        border-radius: 16px;
-      }
-      .crash-btn .icon { font-size: 24px; }
-      .metrics {
-        gap: 20px;
-        padding: 14px 20px;
-        min-width: unset;
-        width: 100%;
-        max-width: 340px;
-        flex-wrap: wrap;
-        justify-content: space-around;
-      }
-      .metric-item::after { display: none; }
-      .metric-item .value { font-size: 20px; }
-      .status-badge { font-size: 11px; padding: 6px 16px; }
-      .footer .subtext { font-size: 11px; max-width: 280px; }
-      .logo-title { font-size: 22px; }
-      .glow-orb-1 { width: 200px; height: 200px; }
-      .glow-orb-2 { width: 150px; height: 150px; }
-      .glow-orb-3 { width: 300px; height: 300px; }
-    }
-
-    @media (max-width: 400px) {
-      .crash-btn {
-        padding: 16px 24px;
-        font-size: 17px;
-        min-width: 160px;
-      }
-      .metrics { gap: 12px; padding: 12px 16px; }
-      .metric-item .value { font-size: 17px; }
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPU Test</title>
 </head>
 <body>
+  <button id="crashBtn" style="padding:20px;font-size:20px;">CRASH GPU NOW</button>
+  <div id="status"></div>
+  <div id="time"></div>
 
-  <!-- ─── BACKGROUND ────────────────────────────────────── -->
-  <canvas id="bgCanvas"></canvas>
-  <div class="glow-orb glow-orb-1"></div>
-  <div class="glow-orb glow-orb-2"></div>
-  <div class="glow-orb glow-orb-3"></div>
-  <div class="glow-overlay"></div>
+  <script>
+let worker = null;
+let isRunning = false;
 
-  <!-- ─── MAIN CONTENT ──────────────────────────────────── -->
-  <div class="container">
+let crashBtn = null;
+let stopBtn = null;
+let statusEl = null;
+let timeEl = null;
 
-    <!-- Logo -->
-    <div class="logo-section">
-      <div class="logo-icon">⚡</div>
-      <div class="logo-title">GPU CRASHER</div>
-      <div class="logo-sub">Extreme Stress Test</div>
-    </div>
+let gl = null;
+let program = null;
+let canvas = null;
+let startTime = 0;
+let animFrameId = null;
+let frameCount = 0;
+let lastFrameTime = 0;
 
-    <!-- Status Badge -->
-    <div class="status-badge" id="statusBadge">
-      <span class="dot" id="statusDot"></span>
-      <span class="status-text" id="statusText">Ready</span>
-    </div>
+// ──────────────────────────────────────────────
+function ensureStatusTimer() {
+  if (!statusEl) {
+    statusEl = document.createElement('div');
+    statusEl.id = 'status';
+    Object.assign(statusEl.style, {
+      position: 'fixed', top: '18px', left: '50%', transform: 'translateX(-50%)',
+      background: 'rgba(0,0,0,0.7)', color: '#dbeafe', padding: '10px 16px',
+      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
+      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
+    });
+    document.body.appendChild(statusEl);
+  }
+  if (!timeEl) {
+    timeEl = document.createElement('div');
+    timeEl.id = 'time';
+    Object.assign(timeEl.style, {
+      position: 'fixed', top: '60px', left: '50%', transform: 'translateX(-50%)',
+      background: 'rgba(0,0,0,0.65)', color: '#d1fae5', padding: '8px 14px',
+      borderRadius: '10px', fontSize: '14px', fontFamily: 'monospace',
+      zIndex: '9999', pointerEvents: 'none', backdropFilter: 'blur(6px)'
+    });
+    document.body.appendChild(timeEl);
+  }
+}
 
-    <!-- Device Badge -->
-    <div class="device-badge" id="deviceBadge">📱 Detecting device...</div>
+function formatTime(ms) {
+  if (!isFinite(ms)) return '--:--.---';
+  const total = Math.max(0, Math.floor(ms));
+  const minutes = Math.floor(total / 60000);
+  const seconds = Math.floor((total % 60000) / 1000);
+  const millis = total % 1000;
+  return `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}.${String(millis).padStart(3,'0')}`;
+}
 
-    <!-- Main Button -->
-    <button class="crash-btn" id="crashBtn">
-      <span class="icon">⚡</span>
-      <span class="label">
-        <span class="shine"></span>
-        <span id="btnLabel">Crash GPU</span>
-        <span class="btn-sub" id="btnSub">Click to initiate meltdown</span>
-      </span>
-    </button>
+function setIdle() {
+  isRunning = false;
+  if (crashBtn) {
+    crashBtn.disabled = false;
+    crashBtn.textContent = "CRASH GPU NOW";
+  }
+  if (animFrameId) {
+    cancelAnimationFrame(animFrameId);
+    animFrameId = null;
+  }
+  ensureStatusTimer();
+  if (statusEl) statusEl.textContent = "Idle – ready to burn";
+  if (timeEl) timeEl.textContent = formatTime(0);
+}
 
-    <!-- Stop Button -->
-    <button class="stop-btn" id="stopBtn">
-      <span class="stop-icon">⏹</span> Stop Torture
-    </button>
+function createWebGLContext() {
+  if (canvas) return true;
 
-    <!-- Metrics -->
-    <div class="metrics" id="metricsPanel">
-      <div class="metric-item">
-        <div class="value" id="fpsValue">--</div>
-        <div class="label">FPS</div>
-      </div>
-      <div class="metric-item">
-        <div class="value" id="timeValue">00:00.000</div>
-        <div class="label">Elapsed</div>
-      </div>
-      <div class="metric-item">
-        <div class="value" id="loadValue">0<span class="unit">%</span></div>
-        <div class="label">GPU Load</div>
-      </div>
-    </div>
+  canvas = document.createElement('canvas');
+  canvas.style.position = 'fixed';
+  canvas.style.inset = '0';
+  canvas.style.zIndex = '-999';
+  canvas.style.pointerEvents = 'none';
+  document.body.appendChild(canvas);
 
-    <!-- Load Bar -->
-    <div class="load-bar-container" id="loadBarContainer">
-      <div class="load-bar" id="loadBar"></div>
-    </div>
+  const scale = 4.0;
+  canvas.width = window.innerWidth * scale;
+  canvas.height = window.innerHeight * scale;
 
-    <!-- Keyboard Hint -->
-    <div class="keyboard-hint">
-      <kbd>Space</kbd> or <kbd>Enter</kbd> · <kbd>Esc</kbd> to stop
-    </div>
+  gl = canvas.getContext('webgl2', {
+    antialias: false,
+    powerPreference: 'high-performance',
+    desynchronized: true,
+    preserveDrawingBuffer: false
+  }) || canvas.getContext('webgl');
 
-    <!-- Footer -->
-    <div class="footer">
-      <div class="creator">
-        Created by <a href="https://github.com/BombedByXander" target="_blank" rel="noreferrer">@prodbyxander</a>
-      </div>
-      <div class="subtext">
-        Engineered for virtual machines · Push the limits
-      </div>
-    </div>
+  if (!gl) {
+    ensureStatusTimer();
+    if (statusEl) statusEl.textContent = "No WebGL — your GPU is pussy";
+    return false;
+  }
 
-  </div>
+  const vsSource = `#version 300 es
+    in vec2 a_position;
+    void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
 
-  <!-- ─── CRASHER.JS ────────────────────────────────────── -->
-  <script src="crasher.js"></script>
+  const fsSource = `#version 300 es
+    precision highp float;
+    out vec4 fragColor;
+    uniform vec2 u_resolution;
+    uniform float u_time;
+
+    float trigHell(vec3 p) {
+      float v = 0.0;
+      float amp = 1.0;
+      for (int i = 0; i < 110; i++) {
+        v += amp * sin(p.x * 13.7 + u_time * 2.4);
+        v += amp * cos(p.y * 16.9 + u_time * 2.8);
+        v += amp * tan(atan(p.z * 10.3 + u_time * 1.6) * 1.4);
+        v += amp * sin(cos(tan(v * 4.1)) * 5.3);
+        v = fract(v * 1.6180339887);
+        amp *= 0.39;
+        p += vec3(sin(u_time * 0.9), cos(u_time * 1.3), tan(u_time * 0.7));
+      }
+      return v;
+    }
+
+    void main() {
+      vec2 uv = (gl_FragCoord.xy - u_resolution * 0.5) / u_resolution.y;
+      vec3 ro = vec3(sin(u_time * 0.8) * 5.0, cos(u_time * 1.0) * 4.0, -10.0);
+      vec3 rd = normalize(vec3(uv * 2.2, 1.9 + sin(u_time * 0.5) * 0.5));
+
+      float dist = 0.0;
+      float accum = 0.0;
+
+      for (int i = 0; i < 420; i++) {
+        vec3 p = ro + rd * dist;
+        float density = abs(trigHell(p * 3.8 + u_time * 1.6)) * 0.12;
+        accum += density * exp(-dist * 0.018);
+        accum += sin(dist * 22.0 + u_time * 7.0) * cos(dist * 15.0) * 0.035;
+        dist += max(0.05, density * 0.42);
+        if (dist > 80.0 || accum > 10.0) break;
+      }
+
+      vec3 col = 0.5 + 0.5 * vec3(
+        sin(accum * 5.1 + u_time * 2.4),
+        cos(accum * 6.8 + u_time * 2.1),
+        tan(accum * 4.7 + u_time * 1.2)
+      );
+
+      fragColor = vec4(col, 1.0);
+    }`;
+
+  const vs = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vs, vsSource);
+  gl.compileShader(vs);
+
+  const fs = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fs, fsSource);
+  gl.compileShader(fs);
+
+  if (!gl.getShaderParameter(vs, gl.COMPILE_STATUS) || !gl.getShaderParameter(fs, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(vs) || gl.getShaderInfoLog(fs));
+    ensureStatusTimer();
+    if (statusEl) statusEl.textContent = "Shader died – GPU said fuck off";
+    return false;
+  }
+
+  program = gl.createProgram();
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  gl.linkProgram(program);
+
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(program));
+    ensureStatusTimer();
+    if (statusEl) statusEl.textContent = "Link failed – program invalid";
+    return false;
+  }
+
+  gl.useProgram(program);
+
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1,-1,  1,-1,  -1,1,
+     1,-1,  1,1,   -1,1
+  ]), gl.STATIC_DRAW);
+
+  const posLoc = gl.getAttribLocation(program, 'a_position');
+  gl.enableVertexAttribArray(posLoc);
+  gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+  return true;
+}
+
+function render(now) {
+  if (!isRunning || !gl || !program) return;
+
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
+  gl.uniform1f(gl.getUniformLocation(program, 'u_time'), (now - startTime) / 1000);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  frameCount++;
+  if (frameCount % 10 === 0) {
+    const fps = Math.round(1000 / (now - lastFrameTime));
+    ensureStatusTimer();
+    if (statusEl) statusEl.textContent = `Nuking... ~${fps} FPS (pray)`;
+    lastFrameTime = now;
+  }
+
+  ensureStatusTimer();
+  if (timeEl) timeEl.textContent = formatTime(now - startTime);
+
+  animFrameId = requestAnimationFrame(render);
+}
+
+function startNuke() {
+  if (isRunning) {
+    setIdle();
+    ensureStatusTimer();
+    if (statusEl) statusEl.textContent = "Stopped – you survived... this time";
+    if (timeEl) timeEl.textContent = '--:--.---';
+    if (stopBtn) stopBtn.style.display = 'none';
+    return;
+  }
+
+  isRunning = true;
+  if (crashBtn) {
+    crashBtn.disabled = false;
+    crashBtn.textContent = "Stop Crashing";
+  }
+  if (stopBtn) stopBtn.style.display = 'inline-block';
+
+  ensureStatusTimer();
+  if (statusEl) statusEl.textContent = "Nuking GPU – hold on tight";
+  if (timeEl) timeEl.textContent = formatTime(0);
+
+  if (!createWebGLContext()) {
+    setIdle();
+    return;
+  }
+
+  startTime = performance.now();
+  frameCount = 0;
+  lastFrameTime = startTime;
+  requestAnimationFrame(render);
+}
+
+// ──────────────────────────────────────────────
+// Wait for DOM
+document.addEventListener('DOMContentLoaded', () => {
+  crashBtn = document.getElementById('crashBtn');
+  stopBtn  = document.getElementById('stopBtn');
+  statusEl = document.getElementById('status');
+  timeEl   = document.getElementById('time');
+
+  if (!crashBtn) {
+    console.error("No #crashBtn element found");
+    ensureStatusTimer();
+    if (statusEl) statusEl.textContent = "Missing crash button – add it to HTML";
+    return;
+  }
+
+  crashBtn.onclick = startNuke;
+
+  if (stopBtn) {
+    stopBtn.onclick = () => {
+      setIdle();
+      ensureStatusTimer();
+      if (statusEl) statusEl.textContent = "Stopped – you survived... this time";
+      if (timeEl) timeEl.textContent = '--:--.---';
+      if (stopBtn) stopBtn.style.display = 'none';
+      if (crashBtn) crashBtn.textContent = "CRASH GPU NOW";
+    };
+  }
+
+  // Dummy worker
+  try {
+    if (worker) worker.terminate();
+    worker = new Worker(URL.createObjectURL(new Blob([`
+      onmessage = function(e) {
+        if (e.data[0] === "ping") postMessage(["pong"]);
+      };
+    `], {type: 'text/javascript'})));
+  } catch (e) {}
+
+  // Resize handling
+  window.addEventListener('resize', () => {
+    if (canvas) {
+      const scale = 4.0;
+      canvas.width = window.innerWidth * scale;
+      canvas.height = window.innerHeight * scale;
+      if (gl) gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+  });
+
+  setIdle();
+});
+  </script>
 </body>
 </html>
