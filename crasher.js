@@ -19,7 +19,6 @@ let canvas = null;
 let startTime = 0;
 let animFrameId = null;
 let frameCount = 0;
-let lastFrameTime = 0;
 let lastFpsUpdate = 0;
 
 // ─── HARDWARE DETECTION ──────────────────────────────────
@@ -32,16 +31,22 @@ function isLowEndDevice() {
 
 const isLowEnd = isLowEndDevice();
 
-// ─── CONFIG ──────────────────────────────────────────────
-const CONFIG = {
-  shaderLoops: isLowEnd ? 80 : 150,        // CRANKED UP
-  raymarchSteps: isLowEnd ? 300 : 500,     // CRANKED UP
-  renderPasses: isLowEnd ? 20 : 10,        // CRANKED UP (20 passes on SE!)
-  resolutionScale: isLowEnd ? 4.0 : 5.0,   // CRANKED UP
-  memoryChunks: isLowEnd ? 300 : 100       // CRANKED UP
+// ─── DYNAMIC CONFIG ──────────────────────────────────────
+// These values ESCALATE as the phone tries to defend itself
+let CONFIG = {
+  shaderLoops: isLowEnd ? 80 : 150,
+  raymarchSteps: isLowEnd ? 300 : 500,
+  renderPasses: isLowEnd ? 20 : 10,
+  resolutionScale: isLowEnd ? 4.0 : 5.0,
+  memoryChunks: isLowEnd ? 300 : 100,
+  escalationLevel: 0,
+  maxEscalation: 20
 };
 
 let memoryBomb = [];
+let lastFps = 60;
+let consecutiveLowFps = 0;
+let escalationTimer = 0;
 
 // ─── UI HELPERS ──────────────────────────────────────────
 function formatTime(ms) {
@@ -51,6 +56,66 @@ function formatTime(ms) {
   const seconds = String(Math.floor((total % 60000) / 1000)).padStart(2, '0');
   const millis = String(total % 1000).padStart(3, '0');
   return `${minutes}:${seconds}.${millis}`;
+}
+
+function escalateTorture() {
+  // If the phone is "defending" itself, we escalate!
+  CONFIG.escalationLevel++;
+  
+  // CRANK EVERYTHING UP
+  CONFIG.shaderLoops = Math.min(200, CONFIG.shaderLoops + 15);
+  CONFIG.raymarchSteps = Math.min(700, CONFIG.raymarchSteps + 30);
+  CONFIG.renderPasses = Math.min(40, CONFIG.renderPasses + 3);
+  CONFIG.resolutionScale = Math.min(8.0, CONFIG.resolutionScale + 0.3);
+  CONFIG.memoryChunks = Math.min(600, CONFIG.memoryChunks + 30);
+  
+  // Add more memory chunks
+  try {
+    for (let i = 0; i < 20; i++) {
+      const size = 1024 * 1024;
+      const chunk = new Uint8Array(size);
+      for (let j = 0; j < size; j += 4096) {
+        chunk[j] = Math.random() * 255;
+      }
+      memoryBomb.push(chunk);
+    }
+  } catch(e) {}
+  
+  // Force recompile shader with new values
+  if (gl && program) {
+    try {
+      gl.deleteProgram(program);
+      program = null;
+    } catch(e) {}
+  }
+  
+  // Destroy and recreate context
+  if (canvas) {
+    try {
+      canvas.remove();
+      canvas = null;
+    } catch(e) {}
+  }
+  
+  // Force garbage collection
+  if (window.gc) {
+    try { window.gc(); } catch(e) {}
+  }
+  
+  // Update status
+  if (statusEl) {
+    statusEl.textContent = `🔥 ESCALATION ${CONFIG.escalationLevel} - ${CONFIG.renderPasses}x passes`;
+    statusEl.style.color = '#ef4444';
+  }
+  
+  console.log(`🔥 ESCALATED to Level ${CONFIG.escalationLevel}: ${CONFIG.renderPasses} passes, ${CONFIG.shaderLoops} loops`);
+  
+  // Recreate context
+  setTimeout(() => {
+    if (isRunning) {
+      createWebGLContext();
+    }
+  }, 100);
 }
 
 function setIdle() {
@@ -71,6 +136,10 @@ function setIdle() {
   }
 
   memoryBomb = [];
+  CONFIG.escalationLevel = 0;
+  consecutiveLowFps = 0;
+  escalationTimer = 0;
+  
   if (window.gc) {
     try { window.gc(); } catch(e) {}
   }
@@ -126,7 +195,6 @@ function createWebGLContext() {
   canvas.width = window.innerWidth * scale;
   canvas.height = window.innerHeight * scale;
 
-  // Try WebGL2 first, fallback to WebGL1
   gl = canvas.getContext('webgl2', {
     antialias: false,
     powerPreference: 'high-performance',
@@ -151,6 +219,10 @@ function createWebGLContext() {
 
   let vsSource, fsSource;
 
+  // ─── DYNAMIC SHADER WITH CURRENT CONFIG VALUES ──────────
+  const currentLoops = CONFIG.shaderLoops;
+  const currentSteps = CONFIG.raymarchSteps;
+
   if (isWebGL2) {
     vsSource = `#version 300 es
       in vec2 a_position;
@@ -165,7 +237,7 @@ function createWebGLContext() {
       float trigHell(vec3 p) {
         float v = 0.0;
         float amp = 1.0;
-        for (int i = 0; i < ${CONFIG.shaderLoops}; i++) {
+        for (int i = 0; i < ${currentLoops}; i++) {
           float fi = float(i);
           v += amp * sin(p.x * 13.7 + u_time * 2.4 + fi * 0.01);
           v += amp * cos(p.y * 16.9 + u_time * 2.8 + fi * 0.01);
@@ -173,7 +245,6 @@ function createWebGLContext() {
           v = v * 0.5 + 0.5;
           amp *= 0.39;
           p += vec3(sin(u_time * 0.9 + fi * 0.001), cos(u_time * 1.3 + fi * 0.001), sin(u_time * 0.7 + fi * 0.001));
-          // EXTRA TORTURE: more operations per loop
           p = p * 1.001 + 0.001;
         }
         return v;
@@ -187,12 +258,12 @@ function createWebGLContext() {
         float dist = 0.0;
         float accum = 0.0;
 
-        for (int i = 0; i < ${CONFIG.raymarchSteps}; i++) {
+        for (int i = 0; i < ${currentSteps}; i++) {
           vec3 p = ro + rd * dist;
           float density = abs(trigHell(p * 3.8 + u_time * 1.6)) * 0.12;
           accum += density * exp(-dist * 0.018);
           accum += sin(dist * 22.0 + u_time * 7.0) * cos(dist * 15.0) * 0.035;
-          accum += cos(dist * 33.0 + u_time * 9.0) * sin(dist * 27.0) * 0.025; // EXTRA
+          accum += cos(dist * 33.0 + u_time * 9.0) * sin(dist * 27.0) * 0.025;
           dist += max(0.02, density * 0.38);
           if (dist > 100.0 || accum > 15.0) break;
         }
@@ -203,7 +274,6 @@ function createWebGLContext() {
           sin(accum * 4.7 + u_time * 1.2 + accum * 3.0)
         );
         
-        // EXTRA color torture
         col += vec3(sin(accum * 50.0 + u_time * 30.0) * 0.05);
         float scanline = sin(uv.y * 1200.0 + u_time * 200.0) * 0.03;
         col += scanline;
@@ -224,7 +294,7 @@ function createWebGLContext() {
       float trigHell(vec3 p) {
         float v = 0.0;
         float amp = 1.0;
-        for (int i = 0; i < ${CONFIG.shaderLoops}; i++) {
+        for (int i = 0; i < ${currentLoops}; i++) {
           float fi = float(i);
           v += amp * sin(p.x * 13.7 + u_time * 2.4 + fi * 0.01);
           v += amp * cos(p.y * 16.9 + u_time * 2.8 + fi * 0.01);
@@ -245,7 +315,7 @@ function createWebGLContext() {
         float dist = 0.0;
         float accum = 0.0;
 
-        for (int i = 0; i < ${CONFIG.raymarchSteps}; i++) {
+        for (int i = 0; i < ${currentSteps}; i++) {
           vec3 p = ro + rd * dist;
           float density = abs(trigHell(p * 3.8 + u_time * 1.6)) * 0.12;
           accum += density * exp(-dist * 0.018);
@@ -308,22 +378,6 @@ function createWebGLContext() {
   gl.enableVertexAttribArray(posLoc);
   gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-  // ─── MEMORY BOMB ──────────────────────────────────────
-  if (CONFIG.memoryChunks > 0) {
-    try {
-      for (let i = 0; i < CONFIG.memoryChunks; i++) {
-        const size = 1024 * 1024;
-        const chunk = new Uint8Array(size);
-        for (let j = 0; j < size; j += 4096) {
-          chunk[j] = Math.random() * 255;
-          chunk[j+1] = Math.random() * 255;
-          chunk[j+2] = Math.random() * 255;
-        }
-        memoryBomb.push(chunk);
-      }
-    } catch(e) {}
-  }
-
   return true;
 }
 
@@ -351,6 +405,28 @@ function render(now) {
     const fps = Math.round(frameCount / ((now - lastFpsUpdate) / 1000));
     const load = Math.min(100, Math.round((1 - fps / 60) * 100 + 20));
     
+    // ─── DETECT THROTTLING & ESCALATE ──────────────────
+    if (fps < 10 && lastFps < 10) {
+      consecutiveLowFps++;
+    } else {
+      consecutiveLowFps = 0;
+    }
+    
+    // If FPS stays low for too long, the phone is "defending" - ESCALATE!
+    if (consecutiveLowFps > 5 && CONFIG.escalationLevel < CONFIG.maxEscalation) {
+      escalateTorture();
+      consecutiveLowFps = 0;
+    }
+    
+    // Also escalate every 30 seconds if still running
+    escalationTimer += 0.2;
+    if (escalationTimer > 30 && CONFIG.escalationLevel < CONFIG.maxEscalation) {
+      escalateTorture();
+      escalationTimer = 0;
+    }
+    
+    lastFps = fps;
+    
     // ─── UPDATE METRICS ──────────────────────────────────
     if (fpsEl) {
       fpsEl.textContent = fps;
@@ -366,30 +442,32 @@ function render(now) {
 
     // ─── UPDATE STATUS ──────────────────────────────────
     if (statusEl) {
+      const escText = CONFIG.escalationLevel > 0 ? ` ⚡Lv${CONFIG.escalationLevel}` : '';
       if (fps < 5) {
-        statusEl.textContent = `💀 MELTING - ${fps} FPS (${CONFIG.renderPasses}x passes)`;
+        statusEl.textContent = `💀 MELTING - ${fps} FPS${escText} (${CONFIG.renderPasses}x passes)`;
         statusEl.style.color = '#ef4444';
         if (statusBadge) statusBadge.className = 'status-badge active';
       } else if (fps < 10) {
-        statusEl.textContent = `☠️ DYING - ${fps} FPS (${CONFIG.renderPasses}x passes)`;
+        statusEl.textContent = `☠️ DYING - ${fps} FPS${escText} (${CONFIG.renderPasses}x passes)`;
         statusEl.style.color = '#ef4444';
         if (statusBadge) statusBadge.className = 'status-badge active';
       } else if (fps < 20) {
-        statusEl.textContent = `🔥 KILLING - ${fps} FPS (${CONFIG.renderPasses}x passes)`;
+        statusEl.textContent = `🔥 KILLING - ${fps} FPS${escText} (${CONFIG.renderPasses}x passes)`;
         statusEl.style.color = '#f59e0b';
         if (statusBadge) statusBadge.className = 'status-badge crashed';
       } else {
-        statusEl.textContent = `⚡ DESTROYING - ${fps} FPS (${CONFIG.renderPasses}x passes)`;
+        statusEl.textContent = `⚡ DESTROYING - ${fps} FPS${escText} (${CONFIG.renderPasses}x passes)`;
         statusEl.style.color = '#8b9bb5';
         if (statusBadge) statusBadge.className = 'status-badge active';
       }
     }
 
     if (btnSub) {
-      btnSub.textContent = fps < 10 ? '⚠️ System under extreme load' : '🔥 Pushing limits';
+      btnSub.textContent = CONFIG.escalationLevel > 5 ? '🔥 UNSTOPPABLE MODE' : 
+                           CONFIG.escalationLevel > 0 ? '⚡ Escalating...' : 
+                           '🔥 Pushing limits';
     }
 
-    // ─── FORCE GC ──────────────────────────────────────
     if (window.gc) {
       try { window.gc(); } catch(e) {}
     }
@@ -411,6 +489,10 @@ function startNuke() {
   }
 
   isRunning = true;
+  CONFIG.escalationLevel = 0;
+  consecutiveLowFps = 0;
+  escalationTimer = 0;
+  
   if (crashBtn) {
     crashBtn.className = 'crash-btn running';
     const icon = document.querySelector('.crash-btn .icon');
@@ -446,6 +528,7 @@ function startNuke() {
   startTime = performance.now();
   frameCount = 0;
   lastFpsUpdate = startTime;
+  lastFps = 60;
   requestAnimationFrame(render);
 }
 
@@ -466,10 +549,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
   if (deviceBadge) {
     if (isLowEnd) {
-      deviceBadge.textContent = '📱 SE MODE - 20 PASSES';
+      deviceBadge.textContent = '📱 SE MODE - UNSTOPPABLE';
     } else {
       const isIPhone = /iPhone|iPad|iPod/.test(navigator.userAgent);
-      deviceBadge.textContent = isIPhone ? '📱 IPHONE MODE' : '💻 DESKTOP MODE';
+      deviceBadge.textContent = isIPhone ? '📱 IPHONE MODE - UNSTOPPABLE' : '💻 DESKTOP MODE';
     }
   }
 
