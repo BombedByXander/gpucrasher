@@ -27,7 +27,6 @@ const isIPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
 
 // ─── TORTURE CONFIG ──────────────────────────────────────
 const CONFIG = {
-  // iPhone gets EXTRA torture
   shaderLoops: isIPhone ? 200 : 110,
   raymarchSteps: isIPhone ? 600 : 420,
   renderPasses: isIPhone ? 12 : 1,
@@ -142,12 +141,23 @@ function createWebGLContext() {
   canvas.width = window.innerWidth * scale;
   canvas.height = window.innerHeight * scale;
 
-  gl = canvas.getContext('webgl2', {
+  // ─── CRITICAL FIX: Use WebGL1 for iPhone ──────────────
+  // iPhones handle WebGL1 much better than WebGL2
+  let contextOptions = {
     antialias: false,
     powerPreference: 'high-performance',
-    desynchronized: true,
     preserveDrawingBuffer: false
-  }) || canvas.getContext('webgl');
+  };
+
+  // Try WebGL2 first on desktop, fallback to WebGL1
+  if (!isIPhone) {
+    gl = canvas.getContext('webgl2', contextOptions);
+  }
+  
+  // If no WebGL2 (or on iPhone), use WebGL1
+  if (!gl) {
+    gl = canvas.getContext('webgl', contextOptions);
+  }
 
   if (!gl) {
     ensureStatusTimer();
@@ -156,14 +166,14 @@ function createWebGLContext() {
   }
 
   // ─── VERTEX SHADER ──────────────────────────────────
-  const vsSource = `#version 300 es
-    in vec2 a_position;
+  // Use WebGL1 compatible shader
+  const vsSource = `
+    attribute vec2 a_position;
     void main() { gl_Position = vec4(a_position, 0.0, 1.0); }`;
 
-  // ─── FRAGMENT SHADER (CRANKED) ─────────────────────
-  const fsSource = `#version 300 es
+  // ─── FRAGMENT SHADER (CRANKED - WebGL1 Compatible) ──
+  const fsSource = `
     precision highp float;
-    out vec4 fragColor;
     uniform vec2 u_resolution;
     uniform float u_time;
 
@@ -205,7 +215,7 @@ function createWebGLContext() {
         tan(accum * 4.7 + u_time * 1.2)
       );
 
-      fragColor = vec4(col, 1.0);
+      gl_FragColor = vec4(col, 1.0);
     }`;
 
   const vs = gl.createShader(gl.VERTEX_SHADER);
@@ -273,7 +283,7 @@ function render(now) {
   const elapsed = (now - startTime) / 1000;
   const heat = Math.min(100, (elapsed / 8) * 40 + 20 + Math.random() * 10);
 
-  // ─── MULTIPLE PASSES (iPhone torture) ──────────────
+  // ─── MULTIPLE PASSES ──────────────────────────────
   for (let pass = 0; pass < CONFIG.renderPasses; pass++) {
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), canvas.width, canvas.height);
